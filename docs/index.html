@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light dark" />
+  <title>Organizador de estudio</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header id="captura-bar">
+    <form id="captura-form" autocomplete="off">
+      <input
+        id="captura-input"
+        type="text"
+        aria-label="Bandeja de captura"
+        placeholder="examen de contabilidad el 14 · repasar tema 3 de estadística · entrega de organizacional el viernes" />
+      <button type="submit">Capturar</button>
+    </form>
+    <div id="captura-flash" class="flash" hidden></div>
+  </header>
+
+  <main>
+    <section id="sin-clasificar-sec" hidden>
+      <h2>Sin clasificar</h2>
+      <p class="hint">No se perdió nada. Corrige asignatura, tipo y fecha, y pasa a su sitio.</p>
+      <div id="sin-clasificar-list"></div>
+    </section>
+
+    <section id="radar-sec">
+      <h2>Radar de colisiones</h2>
+      <p class="hint">Próximas 10 semanas. En rojo, las que acumulan 2 o más eventos. Toca una para ver cuáles.</p>
+      <div id="radar" class="radar"></div>
+      <div id="radar-detalle" class="detalle" hidden></div>
+    </section>
+
+    <section id="heatmap-sec">
+      <h2>Mapa de calor del cuatrimestre</h2>
+      <p class="hint">Una celda por semana. El color es la carga: eventos de esa semana más la deuda de estudio acumulada. Toca una celda para el detalle.</p>
+      <div class="heatmap-wrap"><div id="heatmap" class="heatmap"></div></div>
+      <div class="hm-leyenda">
+        <span>menos</span>
+        <i class="hm-cell n0"></i><i class="hm-cell n1"></i><i class="hm-cell n2"></i><i class="hm-cell n3"></i><i class="hm-cell n4"></i>
+        <span>más</span>
+      </div>
+      <div id="heatmap-detalle" class="detalle" hidden></div>
+    </section>
+
+    <section id="sugerencia-sec">
+      <h2>Qué tocar hoy</h2>
+      <div id="sugerencia"></div>
+    </section>
+
+    <section id="deuda-sec">
+      <h2>Deuda de estudio</h2>
+      <p class="hint">Ordenado por urgencia. El contador de evitación es solo un dato, sin regañina.</p>
+      <div id="deuda"></div>
+    </section>
+
+    <hr />
+
+    <details id="cfg-asignaturas">
+      <summary>Asignaturas</summary>
+      <p class="hint">El clasificador reconoce una asignatura por su nombre o por cualquiera de sus alias.</p>
+      <div id="asignaturas-panel"></div>
+    </details>
+
+    <details id="cfg-temas">
+      <summary>Temas</summary>
+      <div id="temas-panel"></div>
+    </details>
+
+    <details id="cfg-eventos">
+      <summary>Eventos</summary>
+      <div id="eventos-panel"></div>
+    </details>
+
+    <details id="cfg-datos">
+      <summary>Datos y copia de seguridad</summary>
+      <div id="datos-panel"></div>
+    </details>
+
+    <footer>
+      <p class="muted">Todo se guarda solo en este navegador (localStorage). Sin cuentas, sin servidores, sin sincronización.</p>
+    </footer>
+  </main>
+
+  <script src="app.js" defer></script>
+</body>
+</html>
