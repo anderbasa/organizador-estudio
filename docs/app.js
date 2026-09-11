@@ -11,7 +11,7 @@ const STORAGE_KEY = 'organizador_estudio_v1';
 
 const DEFAULT_DB = () => ({
   asignaturas: [], // { id, nombre, alias: [], archivada? }
-  eventos: [],     // { id, asignatura_id, tipo, fecha, hora, temas_relacionados: [], texto_original }
+  eventos: [],     // { id, asignatura_id, tipo, fecha, hora, nota, nota_omitida?, temas_relacionados: [], texto_original }
   temas: [],       // { id, asignatura_id, nombre, fecha_ultimo_repaso, dificultad, dias_evitado_consecutivos }
   sin_clasificar: [], // { id, texto_original, asignatura_id, tipo, fecha, hora }
   meta: {
@@ -242,7 +242,46 @@ function detectarAsignatura(texto) {
       if (t.includes(k) && k.length > bestLen) { best = a; bestLen = k.length; }
     }
   }
-  return best;
+  return best || detectarAsignaturaAproximada(texto);
+}
+
+// Distancia de edición clásica (Levenshtein), para tolerar erratas al escribir rápido.
+function distanciaLevenshtein(a, b) {
+  const m = a.length, n = b.length;
+  if (m === 0) return n;
+  if (n === 0) return m;
+  const dp = new Array(n + 1);
+  for (let j = 0; j <= n; j++) dp[j] = j;
+  for (let i = 1; i <= m; i++) {
+    let prev = dp[0];
+    dp[0] = i;
+    for (let j = 1; j <= n; j++) {
+      const temp = dp[j];
+      dp[j] = a[i - 1] === b[j - 1] ? prev : 1 + Math.min(prev, dp[j], dp[j - 1]);
+      prev = temp;
+    }
+  }
+  return dp[n];
+}
+
+// Solo entra en juego si no hubo coincidencia exacta/substring: compara cada
+// palabra del texto contra el nombre/alias de cada asignatura activa,
+// tolerando 1-3 letras de diferencia según la longitud.
+function detectarAsignaturaAproximada(texto) {
+  const palabras = normalize(texto).split(/[^a-z0-9]+/).filter(w => w.length >= 4);
+  if (!palabras.length) return null;
+  let mejor = null, mejorDist = Infinity;
+  for (const a of activasAsignaturas()) {
+    for (const k of clavesAsignatura(a).filter(k => k.length >= 4)) {
+      const tolerancia = k.length <= 5 ? 1 : k.length <= 9 ? 2 : 3;
+      for (const w of palabras) {
+        if (Math.abs(w.length - k.length) > tolerancia) continue;
+        const d = distanciaLevenshtein(w, k);
+        if (d <= tolerancia && d < mejorDist) { mejor = a; mejorDist = d; }
+      }
+    }
+  }
+  return mejor;
 }
 
 function extraerNombreTema(texto, asignatura) {
@@ -310,9 +349,20 @@ function capturar(textoRaw) {
   const r = clasificar(texto);
 
   if (r.accion === 'evento') {
+    const dup = DB.eventos.find(e =>
+      e.asignatura_id === r.asignatura.id && e.tipo === r.tipo && e.fecha === r.fecha);
+    if (dup) {
+      const seguir = confirm(
+        `Ya tienes ${r.tipo === 'examen' ? 'un examen' : 'una entrega'} de ${r.asignatura.nombre} ` +
+        `el ${formatDMY(r.fecha)}${formatHora(dup.hora)}.\n\n` +
+        `Aceptar = añadir esta captura como otro evento distinto ese mismo día.\n` +
+        `Cancelar = no duplicarlo (parece un escaneo repetido).`
+      );
+      if (!seguir) { flash('No se ha duplicado — ya lo tenías capturado'); return; }
+    }
     DB.eventos.push({
       id: uid(), asignatura_id: r.asignatura.id, tipo: r.tipo,
-      fecha: r.fecha, hora: r.hora || null, temas_relacionados: [], texto_original: texto
+      fecha: r.fecha, hora: r.hora || null, nota: null, temas_relacionados: [], texto_original: texto
     });
     flash(`✓ ${r.tipo === 'examen' ? 'Examen' : 'Entrega'} · ${r.asignatura.nombre} · ${formatDMY(r.fecha)}${formatHora(r.hora)}`, { deshacer: true });
   } else if (r.accion === 'tema') {
@@ -361,7 +411,7 @@ function resolverSinClasificar(id, row) {
   } else {
     if (!fecha) { flash('Elige una fecha'); return; }
     DB.eventos.push({
-      id: uid(), asignatura_id: asigId, tipo, fecha, hora,
+      id: uid(), asignatura_id: asigId, tipo, fecha, hora, nota: null,
       temas_relacionados: [], texto_original: s.texto_original
     });
   }
@@ -412,6 +462,59 @@ function marcarRepasado(id) {
   t.dias_evitado_consecutivos = 0;
   saveDB();
   flash(`✓ "${t.nombre}" repasado hoy`);
+}
+
+/* ============ Notas ============ */
+
+function mediaAsignatura(asigId) {
+  const notas = DB.eventos.filter(e => e.asignatura_id === asigId && typeof e.nota === 'number');
+  if (!notas.length) return null;
+  return notas.reduce((s, e) => s + e.nota, 0) / notas.length;
+}
+
+// Exámenes/entregas ya pasados sin nota, acotado a lo reciente para no
+// desenterrar todo el historial si empiezas a usar la herramienta a mitad de curso.
+function eventosPendientesDeNota() {
+  const hoy = todayISO();
+  const limite = isoDate(addDays(today(), -45));
+  return DB.eventos
+    .filter(e => e.fecha < hoy && e.fecha >= limite && e.nota == null && !e.nota_omitida)
+    .sort((a, b) => b.fecha.localeCompare(a.fecha));
+}
+
+function renderNotasPendientes() {
+  const sec = document.getElementById('notas-pendientes-sec');
+  const list = document.getElementById('notas-pendientes-list');
+  const pendientes = eventosPendientesDeNota();
+  if (!pendientes.length) { sec.hidden = true; list.innerHTML = ''; return; }
+  sec.hidden = false;
+  list.innerHTML = pendientes.map(e => `
+    <div class="np-row" data-id="${e.id}">
+      <div class="np-texto">${e.tipo === 'examen' ? 'Examen' : 'Entrega'} de <strong>${nombreAsig(e.asignatura_id)}</strong> · ${formatDMY(e.fecha)}</div>
+      <div class="np-controls">
+        <input type="number" data-f="nota" min="0" max="10" step="0.1" placeholder="nota (0-10)" inputmode="decimal" />
+        <button data-a="guardar">Guardar</button>
+        <button data-a="omitir" class="ghost">No lo sé</button>
+      </div>
+    </div>`).join('');
+  list.querySelectorAll('.np-row').forEach(row => {
+    const id = row.dataset.id;
+    row.querySelector('[data-a=guardar]').onclick = () => {
+      const raw = row.querySelector('[data-f=nota]').value.trim().replace(',', '.');
+      if (raw === '') { flash('Escribe una nota o pulsa "No lo sé"'); return; }
+      const n = parseFloat(raw);
+      if (isNaN(n) || n < 0 || n > 10) { flash('⚠ Escribe un número entre 0 y 10'); return; }
+      const e = DB.eventos.find(x => x.id === id);
+      e.nota = n;
+      saveDB();
+      flash(`✓ Nota guardada: ${n}`);
+    };
+    row.querySelector('[data-a=omitir]').onclick = () => {
+      const e = DB.eventos.find(x => x.id === id);
+      e.nota_omitida = true;
+      saveDB();
+    };
+  });
 }
 
 /* ============ Urgencia / deuda ============ */
@@ -679,6 +782,7 @@ function flash(msg, opts) {
 function render() {
   renderResumen();
   renderFiltro();
+  renderNotasPendientes();
   renderSinClasificar();
   renderCalendario();
   renderProximos();
@@ -846,15 +950,19 @@ function renderDeuda() {
 function renderAsignaturas() {
   const p = document.getElementById('asignaturas-panel');
   const ordenadas = DB.asignaturas.slice().sort((a, b) => (!!a.archivada) - (!!b.archivada));
-  p.innerHTML = ordenadas.map(a => `
+  p.innerHTML = ordenadas.map(a => {
+    const media = mediaAsignatura(a.id);
+    return `
     <div class="cfg-row ${a.archivada ? 'archivada' : ''}" data-id="${a.id}">
       <input data-f="nombre" value="${escapeHtml(a.nombre)}" ${a.archivada ? 'disabled' : ''} />
       <input data-f="alias" value="${escapeHtml((a.alias || []).join(', '))}" placeholder="alias separados por comas" ${a.archivada ? 'disabled' : ''} />
+      ${media !== null ? `<span class="media-badge">media ${media.toFixed(1)}</span>` : ''}
       ${a.archivada ? '<span class="muted" style="font-size:.78rem">archivada</span>' : ''}
       <button data-a="save" ${a.archivada ? 'disabled' : ''}>Guardar</button>
       <button data-a="archivar" class="ghost">${a.archivada ? 'Desarchivar' : 'Archivar'}</button>
       <button data-a="del" class="ghost">Eliminar</button>
-    </div>`).join('') + `
+    </div>`;
+  }).join('') + `
     <div class="cfg-row nueva">
       <input id="na-nombre" placeholder="nueva asignatura" />
       <input id="na-alias" placeholder="alias: conta, contabilidad…" />
@@ -951,6 +1059,7 @@ function renderEventosPanel() {
         <input type="time" data-f="hora" value="${e.hora || ''}" aria-label="Hora (opcional)" />
         <select data-f="tipo"><option value="examen">examen</option><option value="entrega">entrega</option></select>
         <select data-f="asig">${opcionesAsignaturas(e.asignatura_id).map(a => `<option value="${a.id}">${escapeHtml(a.nombre)}</option>`).join('')}</select>
+        <input type="number" data-f="nota" min="0" max="10" step="0.1" value="${e.nota ?? ''}" placeholder="nota" style="width:5em" />
         <button data-a="save">Guardar</button>
         <button data-a="del" class="ghost">Eliminar</button>
       </div>
@@ -970,6 +1079,8 @@ function renderEventosPanel() {
       e.hora = row.querySelector('[data-f=hora]').value || null;
       e.tipo = row.querySelector('[data-f=tipo]').value;
       e.asignatura_id = row.querySelector('[data-f=asig]').value;
+      const notaRaw = row.querySelector('[data-f=nota]').value;
+      e.nota = notaRaw === '' ? null : Math.max(0, Math.min(10, parseFloat(notaRaw)));
       e.temas_relacionados = [...row.querySelectorAll('[data-tema]:checked')].map(c => c.dataset.tema);
       saveDB(); flash('✓ Evento guardado');
     };

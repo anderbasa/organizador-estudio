@@ -296,6 +296,7 @@ details.card { padding: .8rem 1.1rem; }
 details.card[open] { padding-bottom: 1.1rem; }
 
 .sc-card { border-color: color-mix(in srgb, var(--ambar) 45%, var(--border)); background: var(--ambar-soft); }
+.np-card { border-color: color-mix(in srgb, var(--azul) 40%, var(--border)); background: var(--azul-soft); }
 
 /* ---------------------------------------------------------------------
    Botones y controles
@@ -538,6 +539,22 @@ button.hm-cell { padding: 0; cursor: pointer; }
 .sc-row:last-child { border-bottom: none; }
 .sc-texto { font-style: italic; margin-bottom: .4rem; }
 .sc-controls { display: flex; gap: .4rem; flex-wrap: wrap; align-items: center; }
+
+.np-row { padding: .6rem 0; border-bottom: 1px dashed color-mix(in srgb, var(--azul) 30%, var(--border)); }
+.np-row:last-child { border-bottom: none; }
+.np-texto { margin-bottom: .4rem; }
+.np-controls { display: flex; gap: .4rem; flex-wrap: wrap; align-items: center; }
+.np-controls input[type="number"] { width: 8em; }
+
+.media-badge {
+  font-size: .72rem;
+  font-weight: 700;
+  padding: .15rem .5rem;
+  border-radius: 999px;
+  background: var(--verde-soft);
+  color: var(--verde);
+  white-space: nowrap;
+}
 
 /* ---------------------------------------------------------------------
    Paneles de configuración

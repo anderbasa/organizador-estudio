@@ -23,17 +23,23 @@ Todo ocurre en una sola pantalla, de arriba abajo:
    - `entrega del trabajo de organizacional el viernes`
    - `repasar tema 3 de estadística`
    El clasificador local detecta fecha, hora (opcional), tipo (examen/entrega)
-   y asignatura. Si no lo tiene claro, la entrada **no se pierde**: cae en
-   *Sin clasificar* y la corriges en dos clics. Justo tras capturar, un botón
-   **Deshacer** (unos segundos) revierte la última captura si te has
-   equivocado.
-2. **Calendario mensual** (pieza central). Cada examen/entrega aparece como una
+   y asignatura — tolerando alguna errata al escribir rápido (p. ej.
+   "contabildad" sigue reconociendo Contabilidad). Si aun así no lo tiene
+   claro, la entrada **no se pierde**: cae en *Sin clasificar* y la corriges
+   en dos clics. Justo tras capturar, un botón **Deshacer** (unos segundos)
+   revierte la última captura si te has equivocado. Si el examen/entrega que
+   acabas de escribir ya existía (misma asignatura, tipo y fecha — típico de
+   escanear el NFC dos veces), te pregunta antes de duplicarlo.
+2. **¿Qué tal te fue?**: cuando pasa la fecha de un examen/entrega sin nota,
+   aparece aquí para apuntarla en un tap (o "No lo sé" para no preguntar más
+   por ese). La media por asignatura se ve luego en *Asignaturas*.
+3. **Calendario mensual** (pieza central). Cada examen/entrega aparece como una
    etiqueta de color en su día, con la hora en el detalle; los días con 2+
    eventos se resaltan como colisión. Clic en un día con eventos para ver el
    detalle; clic en un día vacío para empezar a capturar algo con esa fecha
    ya puesta.
-3. **Qué tocar hoy** y **Deuda de estudio**, bajo el calendario.
-4. En la columna lateral: **Próximos** (agenda cronológica de exámenes/entregas)
+4. **Qué tocar hoy** y **Deuda de estudio**, bajo el calendario.
+5. En la columna lateral: **Próximos** (agenda cronológica de exámenes/entregas)
    y el **mapa de calor del cuatrimestre** (una celda por semana; el color es
    la carga — eventos + deuda de estudio acumulada).
 
@@ -98,9 +104,11 @@ Calendario"; si el navegador no lo soporta, descarga el `.ics` normal.
 
 - `asignaturas`: `{ id, nombre, alias[], archivada? }` (`archivada: true` la
   oculta del clasificador, la deuda y la sugerencia diaria, sin borrar nada)
-- `eventos`: `{ id, asignatura_id, tipo: "examen"|"entrega", fecha, hora, temas_relacionados[], texto_original }`
+- `eventos`: `{ id, asignatura_id, tipo: "examen"|"entrega", fecha, hora, nota, nota_omitida?, temas_relacionados[], texto_original }`
   (`hora` es opcional, formato `"HH:MM"`; se detecta del texto — "a las 10", "10:30",
-  "16h", "a las 3 de la tarde" — o se añade a mano en *Eventos*)
+  "16h", "a las 3 de la tarde" — o se añade a mano en *Eventos*. `nota` es la
+  calificación 0-10, opcional; `nota_omitida: true` significa "no lo sé, no
+  preguntes más" para ese evento)
 - `temas`: `{ id, asignatura_id, nombre, fecha_ultimo_repaso, dificultad: "cuesta_arriba"|"repaso_rapido", dias_evitado_consecutivos }`
 - `sin_clasificar`: `{ id, texto_original, asignatura_id, tipo, fecha, hora }`
 - `meta`: `{ cuatrimestre_inicio, cuatrimestre_fin, sugerencia, ultima_exportacion }`
