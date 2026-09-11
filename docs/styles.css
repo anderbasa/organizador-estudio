@@ -198,6 +198,7 @@ hr { border: none; }
   align-items: center;
   gap: .6rem;
 }
+.flash[hidden] { display: none; }
 .flash span { flex: 1; }
 .flash.warn {
   color: var(--ambar);
@@ -216,13 +217,6 @@ hr { border: none; }
 }
 .flash-undo:hover { background: color-mix(in srgb, currentColor 12%, transparent); }
 
-.filtro-asig {
-  max-width: 1180px;
-  margin: .6rem auto 0;
-  display: flex;
-  gap: .4rem;
-  flex-wrap: wrap;
-}
 .filtro-pill {
   font-size: .78rem;
   font-weight: 600;
@@ -238,13 +232,27 @@ hr { border: none; }
   color: var(--accent-contrast);
 }
 
-.resumen {
+.subbar {
   max-width: 1180px;
-  margin: .7rem auto 0;
+  margin: 0 auto;
+  padding: .6rem 1.1rem 0;
+}
+
+/* Resumen y filtro: una sola fila que se desliza en horizontal, en vez de
+   apilarse en varias líneas y comerse la pantalla en vertical. */
+.resumen, .filtro-asig {
   display: flex;
   gap: .5rem;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  padding-bottom: .5rem;
+  margin-bottom: -.1rem;
 }
+.resumen-chip, .filtro-pill { flex: none; }
+.filtro-asig { margin-top: -.3rem; }
+
 .resumen-chip {
   display: flex;
   align-items: baseline;
