@@ -14,21 +14,23 @@ siempre qué tema tienes más abandonado.
 
 Todo ocurre en una sola pantalla, de arriba abajo:
 
-1. **Bandeja de captura** (fija arriba). Escribe frases libres y pulsa Enter:
+1. **Barra superior**: bandeja de captura (fija arriba) + resumen ejecutivo
+   (nº de asignaturas, próximo examen/entrega, temas muy atrasados). Escribe
+   frases libres y pulsa Enter:
    - `examen de contabilidad el 14`
    - `entrega del trabajo de organizacional el viernes`
    - `repasar tema 3 de estadística`
    El clasificador local detecta fecha, tipo (examen/entrega) y asignatura. Si no
    lo tiene claro, la entrada **no se pierde**: cae en *Sin clasificar* y la
    corriges en dos clics.
-2. **Radar de colisiones.** Próximas 10 semanas; en rojo las que juntan 2+ eventos.
-3. **Mapa de calor del cuatrimestre.** Una celda por semana; el color es la carga
-   (eventos + deuda de estudio acumulada). La deuda de semanas pasadas es una
-   estimación a partir del último repaso de cada tema.
-4. **Qué tocar hoy.** Mezcla temas que "cuestan arriba" con otros de "repaso
-   rápido" para no proponer siempre lo más pesado.
-5. **Deuda de estudio.** Lista ordenada por urgencia, con etiqueta de dificultad
-   (editable) y contador de días evitados (dato neutro, sin regañina).
+2. **Calendario mensual** (pieza central). Cada examen/entrega aparece como una
+   etiqueta de color en su día; los días con 2+ eventos se resaltan como
+   colisión. Clic en un día con eventos para ver el detalle; clic en un día
+   vacío para empezar a capturar algo con esa fecha ya puesta.
+3. **Qué tocar hoy** y **Deuda de estudio**, bajo el calendario.
+4. En la columna lateral: **Próximos** (agenda cronológica de exámenes/entregas)
+   y el **mapa de calor del cuatrimestre** (una celda por semana; el color es
+   la carga — eventos + deuda de estudio acumulada).
 
 Debajo, en secciones plegables: **Asignaturas** (con alias para el clasificador),
 **Temas**, **Eventos** y **Datos** (exportar / importar JSON, datos de ejemplo,

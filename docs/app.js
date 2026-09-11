@@ -396,6 +396,139 @@ function nivelCarga(total, max) {
   return 4;
 }
 
+/* ============ Calendario mensual ============ */
+
+let calCursor = today(); // cualquier día dentro del mes que se muestra
+
+function inicioCuadriculaMes(year, month) {
+  return parseDate(mondayOf(new Date(year, month, 1)));
+}
+
+function celdasMes(year, month) {
+  const inicio = inicioCuadriculaMes(year, month);
+  const ultimoDia = new Date(year, month + 1, 0);
+  const diasTotales = daysBetween(isoDate(inicio), isoDate(ultimoDia)) + 1;
+  const semanas = Math.ceil(diasTotales / 7);
+  const celdas = [];
+  for (let i = 0; i < semanas * 7; i++) celdas.push(addDays(inicio, i));
+  return celdas;
+}
+
+function eventosDelDia(iso) {
+  return DB.eventos.filter(e => e.fecha === iso).sort((a, b) => a.tipo.localeCompare(b.tipo));
+}
+
+function renderCalendario() {
+  const label = document.getElementById('cal-label');
+  const grid = document.getElementById('calendario');
+  const det = document.getElementById('calendario-detalle');
+  const year = calCursor.getFullYear();
+  const month = calCursor.getMonth();
+  label.textContent = `${MESES[month]} ${year}`;
+
+  const celdas = celdasMes(year, month);
+  const hoyISO = todayISO();
+
+  grid.innerHTML = celdas.map(d => {
+    const iso = isoDate(d);
+    const fuera = d.getMonth() !== month;
+    const evs = fuera ? [] : eventosDelDia(iso);
+    const clases = ['cal-day'];
+    if (fuera) clases.push('fuera');
+    if (iso === hoyISO) clases.push('hoy');
+    if (evs.length >= 2) clases.push('colision');
+    const chips = evs.slice(0, 2).map(e =>
+      `<span class="cal-chip tipo-${e.tipo}">${e.tipo === 'examen' ? '📕' : '📄'} ${nombreAsig(e.asignatura_id)}</span>`
+    ).join('') + (evs.length > 2 ? `<span class="cal-chip mas">+${evs.length - 2}</span>` : '');
+    return `<button type="button" class="${clases.join(' ')}" data-iso="${iso}" data-fuera="${fuera}">
+      <span class="cal-num">${d.getDate()}</span>
+      <span class="cal-chips">${chips}</span>
+    </button>`;
+  }).join('');
+
+  det.hidden = true;
+  grid.querySelectorAll('.cal-day').forEach(btn => {
+    btn.onclick = () => {
+      if (btn.dataset.fuera === 'true') return;
+      grid.querySelectorAll('.cal-day.seleccionado').forEach(x => x.classList.remove('seleccionado'));
+      const iso = btn.dataset.iso;
+      const evs = eventosDelDia(iso);
+      if (!evs.length) {
+        det.hidden = true;
+        const input = document.getElementById('captura-input');
+        input.value = `el ${formatDMY(iso).slice(0, 5)} `;
+        input.focus();
+        return;
+      }
+      btn.classList.add('seleccionado');
+      det.hidden = false;
+      det.innerHTML = `<strong>${formatDMY(iso)}</strong><ul>` +
+        evs.map(e => `<li>${nombreAsig(e.asignatura_id)} · ${e.tipo}
+          <span class="muted">— ${escapeHtml(e.texto_original || '')}</span></li>`).join('') +
+        `</ul>`;
+    };
+  });
+}
+
+function cambiarMes(delta) {
+  calCursor = new Date(calCursor.getFullYear(), calCursor.getMonth() + delta, 1);
+  renderCalendario();
+}
+
+/* ============ Próximos (agenda lateral) ============ */
+
+function renderProximos() {
+  const cont = document.getElementById('proximos');
+  const hoy = todayISO();
+  const evs = DB.eventos
+    .filter(e => e.fecha >= hoy)
+    .sort((a, b) => a.fecha.localeCompare(b.fecha))
+    .slice(0, 6);
+  if (!evs.length) {
+    cont.innerHTML = '<p class="muted">No hay exámenes ni entregas por delante. Captura uno arriba.</p>';
+    return;
+  }
+  cont.innerHTML = `<ul class="prox-list">` + evs.map(e => {
+    const dias = daysBetween(hoy, e.fecha);
+    const cuando = dias === 0 ? 'hoy' : dias === 1 ? 'mañana' : `${dias} d.`;
+    return `<li class="prox-row">
+      <span class="prox-cuando ${dias <= 3 ? 'pronto' : ''}">${cuando}</span>
+      <div class="prox-main">
+        <div class="prox-asig">${nombreAsig(e.asignatura_id)}</div>
+        <div class="prox-sub">${e.tipo === 'examen' ? 'Examen' : 'Entrega'} · ${formatDMY(e.fecha)}</div>
+      </div>
+    </li>`;
+  }).join('') + `</ul>`;
+}
+
+/* ============ Resumen ejecutivo ============ */
+
+function renderResumen() {
+  const cont = document.getElementById('resumen');
+  const chips = [];
+  chips.push(`<span class="resumen-chip"><strong>${DB.asignaturas.length}</strong> asignatura${DB.asignaturas.length === 1 ? '' : 's'}</span>`);
+
+  const hoy = todayISO();
+  const proximo = DB.eventos.filter(e => e.fecha >= hoy).sort((a, b) => a.fecha.localeCompare(b.fecha))[0];
+  if (proximo) {
+    const dias = daysBetween(hoy, proximo.fecha);
+    const cuando = dias === 0 ? 'hoy' : dias === 1 ? 'mañana' : `en ${dias} días`;
+    chips.push(`<span class="resumen-chip next">Próximo: <strong>${nombreAsig(proximo.asignatura_id)}</strong> (${proximo.tipo}) ${cuando}</span>`);
+  } else {
+    chips.push(`<span class="resumen-chip">Sin exámenes ni entregas a la vista</span>`);
+  }
+
+  if (DB.temas.length) {
+    const rojos = DB.temas.filter(t => infoTema(t).color === 'rojo').length;
+    if (rojos > 0) {
+      chips.push(`<span class="resumen-chip warn"><strong>${rojos}</strong> tema${rojos === 1 ? '' : 's'} muy atrasado${rojos === 1 ? '' : 's'}</span>`);
+    } else {
+      chips.push(`<span class="resumen-chip">Ningún tema en rojo ahora mismo</span>`);
+    }
+  }
+  cont.innerHTML = chips.join('');
+}
+
 /* ============ Render ============ */
 
 function nombreAsig(id) {
@@ -417,8 +550,10 @@ function flash(msg) {
 }
 
 function render() {
+  renderResumen();
   renderSinClasificar();
-  renderRadar();
+  renderCalendario();
+  renderProximos();
   renderHeatmap();
   renderSugerencia();
   renderDeuda();
@@ -459,39 +594,6 @@ function renderSinClasificar() {
       DB.sin_clasificar = DB.sin_clasificar.filter(x => x.id !== id);
       saveDB();
     };
-  });
-}
-
-function renderRadar() {
-  const cont = document.getElementById('radar');
-  const det = document.getElementById('radar-detalle');
-  det.hidden = true;
-  const start = parseDate(mondayOf(today()));
-  const semanas = [];
-  for (let i = 0; i < 10; i++) {
-    const lunesISO = isoDate(addDays(start, i * 7));
-    const finISO = isoDate(addDays(start, i * 7 + 6));
-    const evs = DB.eventos
-      .filter(e => e.fecha >= lunesISO && e.fecha <= finISO)
-      .sort((a, b) => a.fecha.localeCompare(b.fecha));
-    semanas.push({ lunesISO, evs });
-  }
-  cont.innerHTML = semanas.map((s, i) => {
-    const n = s.evs.length;
-    const cls = n >= 2 ? 'colision' : n === 1 ? 'ocupada' : 'libre';
-    return `<button class="semana ${cls}" data-i="${i}" title="Semana del ${formatDMY(s.lunesISO)}">
-      <span class="semana-rango">${s.lunesISO.slice(8)}/${s.lunesISO.slice(5, 7)}</span>
-      <span class="semana-num">${n || ''}</span>
-    </button>`;
-  }).join('');
-  cont.querySelectorAll('.semana').forEach(b => b.onclick = () => {
-    const s = semanas[+b.dataset.i];
-    if (!s.evs.length) { det.hidden = true; return; }
-    det.hidden = false;
-    det.innerHTML = `<strong>Semana del ${formatDMY(s.lunesISO)}</strong><ul>` +
-      s.evs.map(e => `<li>${formatDMY(e.fecha)} · ${nombreAsig(e.asignatura_id)} · ${e.tipo}
-        <span class="muted">— ${escapeHtml(e.texto_original || '')}</span></li>`).join('') +
-      `</ul>`;
   });
 }
 
@@ -845,6 +947,10 @@ document.getElementById('captura-form').addEventListener('submit', e => {
   input.value = '';
   input.focus();
 });
+
+document.getElementById('cal-prev').addEventListener('click', () => cambiarMes(-1));
+document.getElementById('cal-next').addEventListener('click', () => cambiarMes(1));
+document.getElementById('cal-hoy').addEventListener('click', () => { calCursor = today(); renderCalendario(); });
 
 cicloDiario();
 render();
