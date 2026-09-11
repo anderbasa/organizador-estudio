@@ -10,14 +10,15 @@
 const STORAGE_KEY = 'organizador_estudio_v1';
 
 const DEFAULT_DB = () => ({
-  asignaturas: [], // { id, nombre, alias: [] }
-  eventos: [],     // { id, asignatura_id, tipo, fecha, temas_relacionados: [], texto_original }
+  asignaturas: [], // { id, nombre, alias: [], archivada? }
+  eventos: [],     // { id, asignatura_id, tipo, fecha, hora, temas_relacionados: [], texto_original }
   temas: [],       // { id, asignatura_id, nombre, fecha_ultimo_repaso, dificultad, dias_evitado_consecutivos }
-  sin_clasificar: [], // { id, texto_original, asignatura_id, tipo, fecha }
+  sin_clasificar: [], // { id, texto_original, asignatura_id, tipo, fecha, hora }
   meta: {
     cuatrimestre_inicio: null,
     cuatrimestre_fin: null,
-    sugerencia: null // { fecha: 'YYYY-MM-DD', tema_ids: [] }
+    sugerencia: null, // { fecha: 'YYYY-MM-DD', tema_ids: [] }
+    ultima_exportacion: null // ISO date de la última exportación JSON (aviso de copia de seguridad)
   }
 });
 
@@ -213,10 +214,30 @@ function clavesAsignatura(a) {
     .sort((x, y) => y.length - x.length);
 }
 
+function activasAsignaturas() {
+  return DB.asignaturas.filter(a => !a.archivada);
+}
+
+// Opciones de <select> para un desplegable: solo activas, salvo que el
+// elemento que se edita ya apunte a una archivada (para no romper su edición).
+function opcionesAsignaturas(incluirId) {
+  const activas = activasAsignaturas();
+  if (incluirId && !activas.some(a => a.id === incluirId)) {
+    const extra = DB.asignaturas.find(a => a.id === incluirId);
+    if (extra) return [...activas, extra];
+  }
+  return activas;
+}
+
+function temasActivos() {
+  const activasIds = new Set(activasAsignaturas().map(a => a.id));
+  return DB.temas.filter(t => activasIds.has(t.asignatura_id));
+}
+
 function detectarAsignatura(texto) {
   const t = normalize(texto);
   let best = null, bestLen = 0;
-  for (const a of DB.asignaturas) {
+  for (const a of activasAsignaturas()) {
     for (const k of clavesAsignatura(a)) {
       if (t.includes(k) && k.length > bestLen) { best = a; bestLen = k.length; }
     }
@@ -263,9 +284,29 @@ function clasificar(texto) {
 
 /* ============ Captura ============ */
 
+let ultimoSnapshot = null;
+let ultimoSnapshotTimer = null;
+
+function guardarSnapshot() {
+  ultimoSnapshot = JSON.parse(JSON.stringify(DB));
+  clearTimeout(ultimoSnapshotTimer);
+  // El "deshacer" solo tiene sentido mientras el aviso sigue en pantalla.
+  ultimoSnapshotTimer = setTimeout(() => { ultimoSnapshot = null; }, 6000);
+}
+
+function deshacerUltimaCaptura() {
+  if (!ultimoSnapshot) return;
+  DB = ultimoSnapshot;
+  ultimoSnapshot = null;
+  clearTimeout(ultimoSnapshotTimer);
+  saveDB();
+  flash('↩ Deshecho');
+}
+
 function capturar(textoRaw) {
   const texto = (textoRaw || '').trim();
   if (!texto) return;
+  guardarSnapshot();
   const r = clasificar(texto);
 
   if (r.accion === 'evento') {
@@ -273,7 +314,7 @@ function capturar(textoRaw) {
       id: uid(), asignatura_id: r.asignatura.id, tipo: r.tipo,
       fecha: r.fecha, hora: r.hora || null, temas_relacionados: [], texto_original: texto
     });
-    flash(`✓ ${r.tipo === 'examen' ? 'Examen' : 'Entrega'} · ${r.asignatura.nombre} · ${formatDMY(r.fecha)}${formatHora(r.hora)}`);
+    flash(`✓ ${r.tipo === 'examen' ? 'Examen' : 'Entrega'} · ${r.asignatura.nombre} · ${formatDMY(r.fecha)}${formatHora(r.hora)}`, { deshacer: true });
   } else if (r.accion === 'tema') {
     let tema = DB.temas.find(t =>
       t.asignatura_id === r.asignatura.id && normalize(t.nombre) === normalize(r.nombre));
@@ -282,11 +323,11 @@ function capturar(textoRaw) {
         id: uid(), asignatura_id: r.asignatura.id, nombre: r.nombre,
         fecha_ultimo_repaso: todayISO(), dificultad: 'repaso_rapido', dias_evitado_consecutivos: 0
       });
-      flash(`✓ Tema nuevo "${r.nombre}" (${r.asignatura.nombre}), repasado hoy`);
+      flash(`✓ Tema nuevo "${r.nombre}" (${r.asignatura.nombre}), repasado hoy`, { deshacer: true });
     } else {
       tema.fecha_ultimo_repaso = todayISO();
       tema.dias_evitado_consecutivos = 0;
-      flash(`✓ Repaso registrado: "${tema.nombre}" (${r.asignatura.nombre})`);
+      flash(`✓ Repaso registrado: "${tema.nombre}" (${r.asignatura.nombre})`, { deshacer: true });
     }
   } else {
     DB.sin_clasificar.push({
@@ -294,7 +335,7 @@ function capturar(textoRaw) {
       asignatura_id: r.asignatura ? r.asignatura.id : null,
       tipo: r.tipo, fecha: r.fecha, hora: r.hora || null
     });
-    flash('⚠ No pude clasificarlo con seguridad — está abajo en "Sin clasificar"');
+    flash('⚠ No pude clasificarlo con seguridad — está abajo en "Sin clasificar"', { deshacer: true });
   }
   saveDB();
 }
@@ -332,12 +373,13 @@ function resolverSinClasificar(id, row) {
 /* ============ Ciclo diario: sugerencia y evitación ============ */
 
 function generarSugerencia() {
-  const orden = DB.temas.slice().sort((a, b) => infoTema(b).score - infoTema(a).score);
+  const activos = temasActivos();
+  const orden = activos.slice().sort((a, b) => infoTema(b).score - infoTema(a).score);
   const duros = orden.filter(t => t.dificultad === 'cuesta_arriba');
   const ligeros = orden.filter(t => t.dificultad !== 'cuesta_arriba');
   const pick = [];
   let i = 0, j = 0;
-  const objetivo = Math.min(3, DB.temas.length);
+  const objetivo = Math.min(3, activos.length);
   while (pick.length < objetivo) {
     if (pick.length % 2 === 0 && i < duros.length) pick.push(duros[i++]);
     else if (j < ligeros.length) pick.push(ligeros[j++]);
@@ -359,7 +401,7 @@ function cicloDiario() {
     }
     DB.meta.sugerencia = null;
   }
-  if (!DB.meta.sugerencia && DB.temas.length) generarSugerencia();
+  if (!DB.meta.sugerencia && temasActivos().length) generarSugerencia();
   saveDB();
 }
 
@@ -445,7 +487,8 @@ function celdasMes(year, month) {
 }
 
 function eventosDelDia(iso) {
-  return DB.eventos.filter(e => e.fecha === iso)
+  return DB.eventos
+    .filter(e => e.fecha === iso && (!filtroAsignaturaId || e.asignatura_id === filtroAsignaturaId))
     .sort((a, b) => (a.hora || '99:99').localeCompare(b.hora || '99:99'));
 }
 
@@ -518,11 +561,13 @@ function renderProximos() {
   const cont = document.getElementById('proximos');
   const hoy = todayISO();
   const evs = DB.eventos
-    .filter(e => e.fecha >= hoy)
+    .filter(e => e.fecha >= hoy && (!filtroAsignaturaId || e.asignatura_id === filtroAsignaturaId))
     .sort(ordenarPorFechaHora)
     .slice(0, 6);
   if (!evs.length) {
-    cont.innerHTML = '<p class="muted">No hay exámenes ni entregas por delante. Captura uno arriba.</p>';
+    cont.innerHTML = filtroAsignaturaId
+      ? '<p class="muted">Sin exámenes ni entregas para esta asignatura.</p>'
+      : '<p class="muted">No hay exámenes ni entregas por delante. Captura uno arriba.</p>';
     return;
   }
   cont.innerHTML = `<ul class="prox-list">` + evs.map(e => {
@@ -556,32 +601,76 @@ function renderResumen() {
   }
 
   if (DB.temas.length) {
-    const rojos = DB.temas.filter(t => infoTema(t).color === 'rojo').length;
+    const rojos = temasActivos().filter(t => infoTema(t).color === 'rojo').length;
     if (rojos > 0) {
       chips.push(`<span class="resumen-chip warn"><strong>${rojos}</strong> tema${rojos === 1 ? '' : 's'} muy atrasado${rojos === 1 ? '' : 's'}</span>`);
     } else {
       chips.push(`<span class="resumen-chip">Ningún tema en rojo ahora mismo</span>`);
     }
   }
+
+  const hayDatos = DB.asignaturas.length || DB.eventos.length || DB.temas.length;
+  if (hayDatos) {
+    const ultimaExp = DB.meta.ultima_exportacion;
+    if (!ultimaExp) {
+      chips.push(`<span class="resumen-chip warn">Nunca has exportado una copia</span>`);
+    } else {
+      const diasExp = daysSince(ultimaExp);
+      if (diasExp >= 14) {
+        chips.push(`<span class="resumen-chip warn"><strong>${diasExp}</strong> días sin exportar copia</span>`);
+      }
+    }
+  }
   cont.innerHTML = chips.join('');
+}
+
+/* ============ Filtro por asignatura (calendario, próximos, deuda) ============ */
+
+let filtroAsignaturaId = null;
+
+function renderFiltro() {
+  const cont = document.getElementById('filtro-asignatura');
+  const activas = activasAsignaturas();
+  if (filtroAsignaturaId && !activas.some(a => a.id === filtroAsignaturaId)) filtroAsignaturaId = null;
+  if (activas.length < 2) { cont.hidden = true; cont.innerHTML = ''; return; }
+  cont.hidden = false;
+  cont.innerHTML =
+    `<button type="button" class="filtro-pill ${!filtroAsignaturaId ? 'activa' : ''}" data-id="">Todas</button>` +
+    activas.map(a => `<button type="button" class="filtro-pill ${filtroAsignaturaId === a.id ? 'activa' : ''}" data-id="${a.id}">${escapeHtml(a.nombre)}</button>`).join('');
+  cont.querySelectorAll('.filtro-pill').forEach(b => b.onclick = () => {
+    filtroAsignaturaId = b.dataset.id || null;
+    render();
+  });
 }
 
 /* ============ Render ============ */
 
-function nombreAsig(id) {
+function nombreAsigPlano(id) {
   const a = DB.asignaturas.find(x => x.id === id);
-  return a ? escapeHtml(a.nombre) : '¿sin asignatura?';
+  return a ? a.nombre : '¿sin asignatura?';
 }
+function nombreAsig(id) { return escapeHtml(nombreAsigPlano(id)); }
 function escapeHtml(s) {
   return (s || '').replace(/[&<>"']/g, c =>
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
 let flashTimer;
-function flash(msg) {
+function flash(msg, opts) {
   const el = document.getElementById('captura-flash');
-  el.textContent = msg;
+  el.innerHTML = '';
+  const span = document.createElement('span');
+  span.textContent = msg;
+  el.appendChild(span);
   el.classList.toggle('warn', msg.startsWith('⚠'));
+  if (opts && opts.deshacer) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'flash-undo';
+    btn.textContent = 'Deshacer';
+    btn.onclick = deshacerUltimaCaptura;
+    el.appendChild(btn);
+  }
   el.hidden = false;
   clearTimeout(flashTimer);
   flashTimer = setTimeout(() => { el.hidden = true; }, 6000);
@@ -589,6 +678,7 @@ function flash(msg) {
 
 function render() {
   renderResumen();
+  renderFiltro();
   renderSinClasificar();
   renderCalendario();
   renderProximos();
@@ -606,8 +696,9 @@ function renderSinClasificar() {
   const list = document.getElementById('sin-clasificar-list');
   if (!DB.sin_clasificar.length) { sec.hidden = true; list.innerHTML = ''; return; }
   sec.hidden = false;
-  const opts = DB.asignaturas.map(a => `<option value="${a.id}">${escapeHtml(a.nombre)}</option>`).join('');
-  list.innerHTML = DB.sin_clasificar.map(s => `
+  list.innerHTML = DB.sin_clasificar.map(s => {
+    const opts = opcionesAsignaturas(s.asignatura_id).map(a => `<option value="${a.id}">${escapeHtml(a.nombre)}</option>`).join('');
+    return `
     <div class="sc-row" data-id="${s.id}">
       <div class="sc-texto">"${escapeHtml(s.texto_original)}"</div>
       <div class="sc-controls">
@@ -622,7 +713,8 @@ function renderSinClasificar() {
         <button data-a="guardar">Guardar</button>
         <button data-a="borrar" class="ghost">Descartar</button>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
   list.querySelectorAll('.sc-row').forEach(row => {
     const id = row.dataset.id;
     const s = DB.sin_clasificar.find(x => x.id === id);
@@ -687,7 +779,7 @@ function renderHeatmap() {
 function renderSugerencia() {
   const cont = document.getElementById('sugerencia');
   const s = DB.meta.sugerencia;
-  if (!DB.temas.length) {
+  if (!temasActivos().length) {
     cont.innerHTML = '<p class="muted">Añade temas (o captura un repaso) para recibir una sugerencia diaria.</p>';
     return;
   }
@@ -719,11 +811,14 @@ function renderSugerencia() {
 
 function renderDeuda() {
   const cont = document.getElementById('deuda');
-  if (!DB.temas.length) {
-    cont.innerHTML = '<p class="muted">Aún no hay temas. Captura un repaso o añádelos en la sección "Temas".</p>';
+  const temas = temasActivos().filter(t => !filtroAsignaturaId || t.asignatura_id === filtroAsignaturaId);
+  if (!temas.length) {
+    cont.innerHTML = filtroAsignaturaId
+      ? '<p class="muted">Sin temas para esta asignatura.</p>'
+      : '<p class="muted">Aún no hay temas. Captura un repaso o añádelos en la sección "Temas".</p>';
     return;
   }
-  const filas = DB.temas
+  const filas = temas
     .map(t => ({ t, info: infoTema(t) }))
     .sort((a, b) => b.info.score - a.info.score);
   cont.innerHTML = `<ul class="deuda-list">` + filas.map(({ t, info }) => `
@@ -750,11 +845,14 @@ function renderDeuda() {
 
 function renderAsignaturas() {
   const p = document.getElementById('asignaturas-panel');
-  p.innerHTML = DB.asignaturas.map(a => `
-    <div class="cfg-row" data-id="${a.id}">
-      <input data-f="nombre" value="${escapeHtml(a.nombre)}" />
-      <input data-f="alias" value="${escapeHtml((a.alias || []).join(', '))}" placeholder="alias separados por comas" />
-      <button data-a="save">Guardar</button>
+  const ordenadas = DB.asignaturas.slice().sort((a, b) => (!!a.archivada) - (!!b.archivada));
+  p.innerHTML = ordenadas.map(a => `
+    <div class="cfg-row ${a.archivada ? 'archivada' : ''}" data-id="${a.id}">
+      <input data-f="nombre" value="${escapeHtml(a.nombre)}" ${a.archivada ? 'disabled' : ''} />
+      <input data-f="alias" value="${escapeHtml((a.alias || []).join(', '))}" placeholder="alias separados por comas" ${a.archivada ? 'disabled' : ''} />
+      ${a.archivada ? '<span class="muted" style="font-size:.78rem">archivada</span>' : ''}
+      <button data-a="save" ${a.archivada ? 'disabled' : ''}>Guardar</button>
+      <button data-a="archivar" class="ghost">${a.archivada ? 'Desarchivar' : 'Archivar'}</button>
       <button data-a="del" class="ghost">Eliminar</button>
     </div>`).join('') + `
     <div class="cfg-row nueva">
@@ -769,6 +867,12 @@ function renderAsignaturas() {
       a.nombre = row.querySelector('[data-f=nombre]').value.trim() || a.nombre;
       a.alias = row.querySelector('[data-f=alias]').value.split(',').map(s => s.trim()).filter(Boolean);
       saveDB(); flash('✓ Asignatura guardada');
+    };
+    row.querySelector('[data-a=archivar]').onclick = () => {
+      const a = DB.asignaturas.find(x => x.id === id);
+      a.archivada = !a.archivada;
+      saveDB();
+      flash(a.archivada ? `📦 "${a.nombre}" archivada — no saldrá en deuda ni en captura` : `✓ "${a.nombre}" reactivada`);
     };
     row.querySelector('[data-a=del]').onclick = () => {
       if (!confirm('¿Eliminar asignatura? Sus temas y eventos quedarán sin asignatura.')) return;
@@ -789,22 +893,22 @@ function renderAsignaturas() {
 
 function renderTemasPanel() {
   const p = document.getElementById('temas-panel');
-  const asigOpts = DB.asignaturas.map(a => `<option value="${a.id}">${escapeHtml(a.nombre)}</option>`).join('');
   if (!DB.asignaturas.length) {
     p.innerHTML = '<p class="muted">Primero añade alguna asignatura.</p>';
     return;
   }
+  const opts = (incluirId) => opcionesAsignaturas(incluirId).map(a => `<option value="${a.id}">${escapeHtml(a.nombre)}</option>`).join('');
   p.innerHTML = (DB.temas.length ? DB.temas.map(t => `
     <div class="cfg-row" data-id="${t.id}">
       <input data-f="nombre" value="${escapeHtml(t.nombre)}" />
-      <select data-f="asig">${asigOpts}</select>
+      <select data-f="asig">${opts(t.asignatura_id)}</select>
       <label class="muted" style="font-size:.8rem">últ. repaso <input type="date" data-f="repaso" value="${t.fecha_ultimo_repaso || ''}" /></label>
       <button data-a="save">Guardar</button>
       <button data-a="del" class="ghost">Eliminar</button>
     </div>`).join('') : '<p class="muted">Sin temas.</p>') + `
     <div class="cfg-row nueva">
       <input id="nt-nombre" placeholder="nuevo tema" />
-      <select id="nt-asig">${asigOpts}</select>
+      <select id="nt-asig">${opts()}</select>
       <button id="nt-add">Añadir</button>
     </div>`;
   p.querySelectorAll('.cfg-row[data-id]').forEach(row => {
@@ -846,7 +950,7 @@ function renderEventosPanel() {
         <input type="date" data-f="fecha" value="${e.fecha}" />
         <input type="time" data-f="hora" value="${e.hora || ''}" aria-label="Hora (opcional)" />
         <select data-f="tipo"><option value="examen">examen</option><option value="entrega">entrega</option></select>
-        <select data-f="asig">${DB.asignaturas.map(a => `<option value="${a.id}">${escapeHtml(a.nombre)}</option>`).join('')}</select>
+        <select data-f="asig">${opcionesAsignaturas(e.asignatura_id).map(a => `<option value="${a.id}">${escapeHtml(a.nombre)}</option>`).join('')}</select>
         <button data-a="save">Guardar</button>
         <button data-a="del" class="ghost">Eliminar</button>
       </div>
@@ -891,7 +995,15 @@ function renderDatosPanel() {
       <button id="d-demo" class="ghost">Cargar datos de ejemplo</button>
       <button id="d-reset" class="ghost danger">Borrar todo</button>
     </div>
-    <p class="muted">Los datos viven solo en este navegador. Exporta de vez en cuando para tener copia o pasarlos a otro equipo.</p>`;
+    <div class="cfg-row nueva">
+      <button id="d-ics">📅 Exportar a Calendario (.ics)</button>
+    </div>
+    <p class="muted">
+      El JSON es la copia de seguridad completa (para restaurarla aquí o en otro navegador).
+      El .ics es solo los exámenes/entregas, para importarlos en Calendario de iPhone y
+      que sea la app de Apple la que te avise — esta web no manda notificaciones.
+      ${DB.meta.ultima_exportacion ? `Última copia JSON: ${formatDMY(DB.meta.ultima_exportacion)}.` : 'Aún no has exportado ninguna copia JSON.'}
+    </p>`;
   p.querySelector('#q-save').onclick = () => {
     const ini = p.querySelector('#q-ini').value;
     const fin = p.querySelector('#q-fin').value;
@@ -903,6 +1015,7 @@ function renderDatosPanel() {
   };
   p.querySelector('#d-export').onclick = exportarJSON;
   p.querySelector('#d-import').onchange = importarJSON;
+  p.querySelector('#d-ics').onclick = exportarICS;
   p.querySelector('#d-demo').onclick = () => {
     if (confirm('¿Cargar datos de ejemplo? Se añaden a lo que ya tengas.')) cargarDemo();
   };
@@ -921,6 +1034,68 @@ function exportarJSON() {
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = `organizador-estudio-${todayISO()}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(a.href);
+  DB.meta.ultima_exportacion = todayISO();
+  saveDB();
+}
+
+/* ============ Exportar a calendario (.ics) ============ */
+
+function icsEscape(s) {
+  return (s || '')
+    .replace(/\\/g, '\\\\')
+    .replace(/;/g, '\\;')
+    .replace(/,/g, '\\,')
+    .replace(/\n/g, '\\n');
+}
+
+function generarICS() {
+  const dtstamp = new Date().toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+  const lineas = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Organizador de estudio//ES', 'CALSCALE:GREGORIAN'];
+  for (const e of DB.eventos) {
+    const summary = `${e.tipo === 'examen' ? 'Examen' : 'Entrega'}: ${nombreAsigPlano(e.asignatura_id)}`;
+    lineas.push('BEGIN:VEVENT');
+    lineas.push(`UID:${e.id}@organizador-estudio.local`);
+    lineas.push(`DTSTAMP:${dtstamp}`);
+    if (e.hora) {
+      const [hh, mm] = e.hora.split(':').map(Number);
+      const inicio = new Date(parseDate(e.fecha));
+      inicio.setHours(hh, mm, 0, 0);
+      const fin = new Date(inicio.getTime() + 60 * 60000);
+      const fmt = d => `${isoDate(d).replace(/-/g, '')}T${String(d.getHours()).padStart(2, '0')}${String(d.getMinutes()).padStart(2, '0')}00`;
+      lineas.push(`DTSTART:${fmt(inicio)}`);
+      lineas.push(`DTEND:${fmt(fin)}`);
+    } else {
+      const ymd = e.fecha.replace(/-/g, '');
+      const siguiente = isoDate(addDays(parseDate(e.fecha), 1)).replace(/-/g, '');
+      lineas.push(`DTSTART;VALUE=DATE:${ymd}`);
+      lineas.push(`DTEND;VALUE=DATE:${siguiente}`);
+    }
+    lineas.push(`SUMMARY:${icsEscape(summary)}`);
+    if (e.texto_original) lineas.push(`DESCRIPTION:${icsEscape(e.texto_original)}`);
+    lineas.push('END:VEVENT');
+  }
+  lineas.push('END:VCALENDAR');
+  return lineas.join('\r\n');
+}
+
+function exportarICS() {
+  if (!DB.eventos.length) { flash('No hay exámenes ni entregas que exportar todavía'); return; }
+  const ics = generarICS();
+  const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
+  const file = new File([blob], 'organizador-estudio.ics', { type: 'text/calendar' });
+
+  // En iPhone, compartir directo abre "Añadir a Calendario" sin pasar por Archivos.
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    navigator.share({ files: [file], title: 'Calendario de estudio' }).catch(() => {});
+    return;
+  }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'organizador-estudio.ics';
   document.body.appendChild(a);
   a.click();
   a.remove();
