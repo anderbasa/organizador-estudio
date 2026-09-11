@@ -82,7 +82,9 @@ guardar una copia, y **Importar JSON** para restaurarla o moverla a otro equipo.
 `localStorage` bajo la clave `organizador_estudio_v1`:
 
 - `asignaturas`: `{ id, nombre, alias[] }`
-- `eventos`: `{ id, asignatura_id, tipo: "examen"|"entrega", fecha, temas_relacionados[], texto_original }`
+- `eventos`: `{ id, asignatura_id, tipo: "examen"|"entrega", fecha, hora, temas_relacionados[], texto_original }`
+  (`hora` es opcional, formato `"HH:MM"`; se detecta del texto — "a las 10", "10:30",
+  "16h", "a las 3 de la tarde" — o se añade a mano en *Eventos*)
 - `temas`: `{ id, asignatura_id, nombre, fecha_ultimo_repaso, dificultad: "cuesta_arriba"|"repaso_rapido", dias_evitado_consecutivos }`
 - `sin_clasificar`: `{ id, texto_original, asignatura_id, tipo, fecha }`
 - `meta`: `{ cuatrimestre_inicio, cuatrimestre_fin, sugerencia }`

@@ -128,9 +128,10 @@ function detectarFecha(texto) {
     return isoDate(cand);
   }
 
-  // relativas
-  if (/\bpasado manana\b/.test(t)) return isoDate(addDays(hoy, 2));
-  if (/\bmanana\b/.test(t)) return isoDate(addDays(hoy, 1));
+  // relativas (ojo: "de/por la mañana" es franja horaria, no significa "tomorrow")
+  const tSinFranja = t.replace(/\b(de|por) la manana\b/g, ' ');
+  if (/\bpasado manana\b/.test(tSinFranja)) return isoDate(addDays(hoy, 2));
+  if (/\bmanana\b/.test(tSinFranja)) return isoDate(addDays(hoy, 1));
   if (/\bhoy\b/.test(t)) return todayISO();
 
   m = t.match(/\ben (\d{1,2}) dias?\b/);
@@ -166,6 +167,32 @@ function detectarFecha(texto) {
   }
   return null;
 }
+
+function detectarHora(texto) {
+  const t = ' ' + normalize(texto).replace(/\s+/g, ' ') + ' ';
+  let h = null, m = 0;
+
+  let match = t.match(/\b(?:a las|sobre las) (\d{1,2})(?:[:.](\d{2}))?\b/);
+  if (match) { h = +match[1]; m = match[2] ? +match[2] : 0; }
+
+  if (h === null) {
+    match = t.match(/\b(\d{1,2}):(\d{2})\b/);
+    if (match) { h = +match[1]; m = +match[2]; }
+  }
+  if (h === null) {
+    match = t.match(/\b(\d{1,2})h(\d{2})?\b/);
+    if (match) { h = +match[1]; m = match[2] ? +match[2] : 0; }
+  }
+  if (h === null || h > 23 || m > 59) return null;
+
+  if ((/\bde la tarde\b/.test(t) || /\bpor la tarde\b/.test(t) ||
+       /\bde la noche\b/.test(t) || /\bpor la noche\b/.test(t)) && h >= 1 && h <= 11) {
+    h += 12;
+  }
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
+function formatHora(hora) { return hora ? ` · ${hora}` : ''; }
 
 function detectarTipo(texto) {
   const t = normalize(texto);
@@ -214,6 +241,7 @@ function extraerNombreTema(texto, asignatura) {
 
 function clasificar(texto) {
   const fecha = detectarFecha(texto);
+  const hora = detectarHora(texto);
   const tipo = detectarTipo(texto);
   const asignatura = detectarAsignatura(texto);
   const repaso = esRepaso(texto);
@@ -222,13 +250,14 @@ function clasificar(texto) {
     return { accion: 'tema', asignatura, nombre: extraerNombreTema(texto, asignatura) || 'general' };
   }
   if (fecha && tipo && asignatura) {
-    return { accion: 'evento', asignatura, tipo, fecha };
+    return { accion: 'evento', asignatura, tipo, fecha, hora };
   }
   return {
     accion: 'sin_clasificar',
     asignatura,
     tipo: repaso ? 'repaso' : (tipo || 'examen'),
-    fecha: fecha || todayISO()
+    fecha: fecha || todayISO(),
+    hora
   };
 }
 
@@ -242,9 +271,9 @@ function capturar(textoRaw) {
   if (r.accion === 'evento') {
     DB.eventos.push({
       id: uid(), asignatura_id: r.asignatura.id, tipo: r.tipo,
-      fecha: r.fecha, temas_relacionados: [], texto_original: texto
+      fecha: r.fecha, hora: r.hora || null, temas_relacionados: [], texto_original: texto
     });
-    flash(`✓ ${r.tipo === 'examen' ? 'Examen' : 'Entrega'} · ${r.asignatura.nombre} · ${formatDMY(r.fecha)}`);
+    flash(`✓ ${r.tipo === 'examen' ? 'Examen' : 'Entrega'} · ${r.asignatura.nombre} · ${formatDMY(r.fecha)}${formatHora(r.hora)}`);
   } else if (r.accion === 'tema') {
     let tema = DB.temas.find(t =>
       t.asignatura_id === r.asignatura.id && normalize(t.nombre) === normalize(r.nombre));
@@ -263,7 +292,7 @@ function capturar(textoRaw) {
     DB.sin_clasificar.push({
       id: uid(), texto_original: texto,
       asignatura_id: r.asignatura ? r.asignatura.id : null,
-      tipo: r.tipo, fecha: r.fecha
+      tipo: r.tipo, fecha: r.fecha, hora: r.hora || null
     });
     flash('⚠ No pude clasificarlo con seguridad — está abajo en "Sin clasificar"');
   }
@@ -276,6 +305,7 @@ function resolverSinClasificar(id, row) {
   const asigId = row.querySelector('[data-f=asignatura]').value;
   const tipo = row.querySelector('[data-f=tipo]').value;
   const fecha = row.querySelector('[data-f=fecha]').value;
+  const hora = row.querySelector('[data-f=hora]').value || null;
   if (!asigId) { flash('Elige una asignatura'); return; }
 
   if (tipo === 'repaso') {
@@ -290,7 +320,7 @@ function resolverSinClasificar(id, row) {
   } else {
     if (!fecha) { flash('Elige una fecha'); return; }
     DB.eventos.push({
-      id: uid(), asignatura_id: asigId, tipo, fecha,
+      id: uid(), asignatura_id: asigId, tipo, fecha, hora,
       temas_relacionados: [], texto_original: s.texto_original
     });
   }
@@ -415,7 +445,8 @@ function celdasMes(year, month) {
 }
 
 function eventosDelDia(iso) {
-  return DB.eventos.filter(e => e.fecha === iso).sort((a, b) => a.tipo.localeCompare(b.tipo));
+  return DB.eventos.filter(e => e.fecha === iso)
+    .sort((a, b) => (a.hora || '99:99').localeCompare(b.hora || '99:99'));
 }
 
 function renderCalendario() {
@@ -463,7 +494,7 @@ function renderCalendario() {
       btn.classList.add('seleccionado');
       det.hidden = false;
       det.innerHTML = `<strong>${formatDMY(iso)}</strong><ul>` +
-        evs.map(e => `<li>${nombreAsig(e.asignatura_id)} · ${e.tipo}
+        evs.map(e => `<li>${nombreAsig(e.asignatura_id)} · ${e.tipo}${formatHora(e.hora)}
           <span class="muted">— ${escapeHtml(e.texto_original || '')}</span></li>`).join('') +
         `</ul>`;
     };
@@ -477,12 +508,18 @@ function cambiarMes(delta) {
 
 /* ============ Próximos (agenda lateral) ============ */
 
+function ordenarPorFechaHora(a, b) {
+  return a.fecha === b.fecha
+    ? (a.hora || '99:99').localeCompare(b.hora || '99:99')
+    : a.fecha.localeCompare(b.fecha);
+}
+
 function renderProximos() {
   const cont = document.getElementById('proximos');
   const hoy = todayISO();
   const evs = DB.eventos
     .filter(e => e.fecha >= hoy)
-    .sort((a, b) => a.fecha.localeCompare(b.fecha))
+    .sort(ordenarPorFechaHora)
     .slice(0, 6);
   if (!evs.length) {
     cont.innerHTML = '<p class="muted">No hay exámenes ni entregas por delante. Captura uno arriba.</p>';
@@ -495,7 +532,7 @@ function renderProximos() {
       <span class="prox-cuando ${dias <= 3 ? 'pronto' : ''}">${cuando}</span>
       <div class="prox-main">
         <div class="prox-asig">${nombreAsig(e.asignatura_id)}</div>
-        <div class="prox-sub">${e.tipo === 'examen' ? 'Examen' : 'Entrega'} · ${formatDMY(e.fecha)}</div>
+        <div class="prox-sub">${e.tipo === 'examen' ? 'Examen' : 'Entrega'} · ${formatDMY(e.fecha)}${formatHora(e.hora)}</div>
       </div>
     </li>`;
   }).join('') + `</ul>`;
@@ -509,11 +546,11 @@ function renderResumen() {
   chips.push(`<span class="resumen-chip"><strong>${DB.asignaturas.length}</strong> asignatura${DB.asignaturas.length === 1 ? '' : 's'}</span>`);
 
   const hoy = todayISO();
-  const proximo = DB.eventos.filter(e => e.fecha >= hoy).sort((a, b) => a.fecha.localeCompare(b.fecha))[0];
+  const proximo = DB.eventos.filter(e => e.fecha >= hoy).sort(ordenarPorFechaHora)[0];
   if (proximo) {
     const dias = daysBetween(hoy, proximo.fecha);
     const cuando = dias === 0 ? 'hoy' : dias === 1 ? 'mañana' : `en ${dias} días`;
-    chips.push(`<span class="resumen-chip next">Próximo: <strong>${nombreAsig(proximo.asignatura_id)}</strong> (${proximo.tipo}) ${cuando}</span>`);
+    chips.push(`<span class="resumen-chip next">Próximo: <strong>${nombreAsig(proximo.asignatura_id)}</strong> (${proximo.tipo}) ${cuando}${formatHora(proximo.hora)}</span>`);
   } else {
     chips.push(`<span class="resumen-chip">Sin exámenes ni entregas a la vista</span>`);
   }
@@ -581,6 +618,7 @@ function renderSinClasificar() {
           <option value="repaso">repaso (tema)</option>
         </select>
         <input type="date" data-f="fecha" value="${s.fecha || todayISO()}" />
+        <input type="time" data-f="hora" value="${s.hora || ''}" aria-label="Hora (opcional)" />
         <button data-a="guardar">Guardar</button>
         <button data-a="borrar" class="ghost">Descartar</button>
       </div>
@@ -627,7 +665,7 @@ function renderHeatmap() {
   cont.querySelectorAll('.hm-cell').forEach(b => b.onclick = () => {
     const c = celdas[+b.dataset.i];
     const finSemana = isoDate(addDays(parseDate(c.lunesISO), 6));
-    const evs = DB.eventos.filter(e => e.fecha >= c.lunesISO && e.fecha <= finSemana);
+    const evs = DB.eventos.filter(e => e.fecha >= c.lunesISO && e.fecha <= finSemana).sort(ordenarPorFechaHora);
     const atrasados = DB.temas
       .map(t => ({ t, d: t.fecha_ultimo_repaso ? daysBetween(t.fecha_ultimo_repaso, c.lunesISO) : 999 }))
       .filter(x => x.d >= 10)
@@ -637,7 +675,7 @@ function renderHeatmap() {
     det.innerHTML = `<strong>Semana del ${formatDMY(c.lunesISO)}</strong>` +
       `<div class="muted">${c.nEv} evento(s) · índice de carga ${c.total.toFixed(1)}</div>` +
       (evs.length
-        ? `<ul>` + evs.map(e => `<li>${formatDMY(e.fecha)} · ${nombreAsig(e.asignatura_id)} · ${e.tipo}</li>`).join('') + `</ul>`
+        ? `<ul>` + evs.map(e => `<li>${formatDMY(e.fecha)} · ${nombreAsig(e.asignatura_id)} · ${e.tipo}${formatHora(e.hora)}</li>`).join('') + `</ul>`
         : `<p class="muted">Sin eventos esa semana.</p>`) +
       (atrasados.length
         ? `<div class="muted">Temas más atrasados en ese momento:</div><ul>` +
@@ -800,12 +838,13 @@ function renderTemasPanel() {
 
 function renderEventosPanel() {
   const p = document.getElementById('eventos-panel');
-  const evs = DB.eventos.slice().sort((a, b) => a.fecha.localeCompare(b.fecha));
+  const evs = DB.eventos.slice().sort(ordenarPorFechaHora);
   if (!evs.length) { p.innerHTML = '<p class="muted">Sin eventos.</p>'; return; }
   p.innerHTML = evs.map(e => `
     <div class="cfg-row ev" data-id="${e.id}">
       <div style="display:flex;gap:.4rem;flex-wrap:wrap;align-items:center">
         <input type="date" data-f="fecha" value="${e.fecha}" />
+        <input type="time" data-f="hora" value="${e.hora || ''}" aria-label="Hora (opcional)" />
         <select data-f="tipo"><option value="examen">examen</option><option value="entrega">entrega</option></select>
         <select data-f="asig">${DB.asignaturas.map(a => `<option value="${a.id}">${escapeHtml(a.nombre)}</option>`).join('')}</select>
         <button data-a="save">Guardar</button>
@@ -824,6 +863,7 @@ function renderEventosPanel() {
     row.querySelector('[data-f=asig]').value = e.asignatura_id;
     row.querySelector('[data-a=save]').onclick = () => {
       e.fecha = row.querySelector('[data-f=fecha]').value || e.fecha;
+      e.hora = row.querySelector('[data-f=hora]').value || null;
       e.tipo = row.querySelector('[data-f=tipo]').value;
       e.asignatura_id = row.querySelector('[data-f=asig]').value;
       e.temas_relacionados = [...row.querySelectorAll('[data-tema]:checked')].map(c => c.dataset.tema);
