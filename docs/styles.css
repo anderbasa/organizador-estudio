@@ -160,8 +160,9 @@ hr { border: none; }
 #captura-input {
   flex: 1;
   min-width: 0;
-  padding: .55rem 0;
-  font-size: .93rem;
+  padding: .6rem 0;
+  /* 16px+ evita el zoom automático de iOS Safari al enfocar el campo */
+  font-size: 16px;
   border: none;
   background: transparent;
   color: var(--text);
@@ -185,10 +186,19 @@ hr { border: none; }
 
 .flash {
   max-width: 1180px;
-  margin: .55rem auto 0;
-  font-size: .82rem;
+  margin: .6rem auto 0;
+  padding: .55rem .9rem;
+  border-radius: var(--radius-sm);
+  font-size: .88rem;
+  font-weight: 700;
   color: var(--accent-strong);
-  font-weight: 600;
+  background: var(--accent-soft);
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border));
+}
+.flash.warn {
+  color: var(--ambar);
+  background: var(--ambar-soft);
+  border-color: color-mix(in srgb, var(--ambar) 40%, var(--border));
 }
 
 .resumen {
@@ -282,6 +292,8 @@ button.primary:hover { background: var(--accent-strong); }
 
 input, select {
   font: inherit;
+  /* 16px+ evita el zoom automático de iOS Safari al enfocar el campo */
+  font-size: 16px;
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--text);
@@ -289,6 +301,13 @@ input, select {
   padding: .38rem .5rem;
 }
 input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* Objetivos táctiles más grandes en pantallas táctiles (uso principal: iPhone) */
+@media (pointer: coarse) {
+  button, .btnfile, select, input[type="date"] { min-height: 44px; }
+  .icon-btn { width: 40px; height: 40px; }
+  .cal-day { min-height: 46px; }
+}
 
 /* ---------------------------------------------------------------------
    Calendario mensual

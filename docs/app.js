@@ -544,6 +544,7 @@ let flashTimer;
 function flash(msg) {
   const el = document.getElementById('captura-flash');
   el.textContent = msg;
+  el.classList.toggle('warn', msg.startsWith('⚠'));
   el.hidden = false;
   clearTimeout(flashTimer);
   flashTimer = setTimeout(() => { el.hidden = true; }, 6000);
