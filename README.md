@@ -1,120 +1,64 @@
-# Organizador de estudio
+# Matrícula
 
-Herramienta de una sola pantalla para no perder el hilo en un curso con varias
-asignaturas a la vez: ver venir los exámenes antes de que se amontonen y saber
-siempre qué tema tienes más abandonado.
+Tu cuatrimestre bajo control, como app en la pantalla de inicio del iPhone:
+exámenes y entregas, repaso espaciado, plan hasta cada examen, modo
+concentración y calculadora de nota. Antes se llamaba "Organizador de estudio".
 
-- **Sin backend, sin cuentas, sin login.** Todos los datos se guardan en el
-  navegador (`localStorage`).
-- **Sin IA en tiempo real.** El clasificador de texto funciona solo con reglas.
-- **No es una PWA.** Sin `manifest.json`, sin service worker. Página web normal.
-- **HTML/CSS/JS estático.** Se sirve tal cual desde GitHub Pages.
+**Web:** https://anderbasa.github.io/organizador-estudio/ (es también la URL
+de la pegatina NFC).
 
-## Uso
+## Pestañas
 
-Todo ocurre en una sola pantalla, de arriba abajo:
+- **Hoy**: captura en texto libre (“examen de conta el 14 a las 10”,
+  “entrega de organizacional el viernes”, “repasar tema 3 de estadística”),
+  cuenta atrás del próximo examen, **Para hoy** (lo del plan de cada examen +
+  los temas cuyo repaso ha vencido, alternando duros y ligeros; desliza a la
+  derecha para marcar como repasado), “¿Qué tal te fue?” para apuntar notas,
+  lo que quedó “Sin clasificar” y la semana.
+- **Calendario**: mes con los exámenes y entregas en el color de cada
+  asignatura, filtro por asignatura, próximos y carga del cuatrimestre.
+- **Foco**: temporizador (15/25/45/60 min) ligado a una asignatura y un tema;
+  al terminar pregunta qué tal el repaso y suma los minutos. Estadísticas de
+  la semana.
+- **Asignaturas**: cada una con sus exámenes, el **plan día a día** hasta el
+  próximo examen, sus **temas** con repaso espaciado (vuelven a los 1, 3, 7,
+  14, 30 y 60 días según “Me costó / Bien / Fácil”), la **calculadora de
+  nota** (partes con peso y nota → nota actual y lo que necesitas para
+  aprobado/notable/sobresaliente/MH) y sus ajustes (alias, color, archivar).
+- **Ajustes**: estado de la sincronización, cuatrimestre, duraciones, nota
+  para aprobar, días de plan, exportar a Calendario (`.ics` con avisos) y
+  copia de seguridad (JSON).
 
-1. **Barra superior**: bandeja de captura (fija arriba) + resumen ejecutivo
-   (nº de asignaturas, próximo examen/entrega con hora si la tiene, temas muy
-   atrasados, aviso si llevas tiempo sin exportar copia) + filtro rápido por
-   asignatura (aparece solo si tienes 2 o más activas; afecta al calendario,
-   "Próximos" y la deuda). Escribe frases libres y pulsa Enter:
-   - `examen de contabilidad el 14 a las 10`
-   - `entrega del trabajo de organizacional el viernes`
-   - `repasar tema 3 de estadística`
-   El clasificador local detecta fecha, hora (opcional), tipo (examen/entrega)
-   y asignatura — tolerando alguna errata al escribir rápido (p. ej.
-   "contabildad" sigue reconociendo Contabilidad). Si aun así no lo tiene
-   claro, la entrada **no se pierde**: cae en *Sin clasificar* y la corriges
-   en dos clics. Justo tras capturar, un botón **Deshacer** (unos segundos)
-   revierte la última captura si te has equivocado. Si el examen/entrega que
-   acabas de escribir ya existía (misma asignatura, tipo y fecha — típico de
-   escanear el NFC dos veces), te pregunta antes de duplicarlo.
-2. **¿Qué tal te fue?**: cuando pasa la fecha de un examen/entrega sin nota,
-   aparece aquí para apuntarla en un tap (o "No lo sé" para no preguntar más
-   por ese). La media por asignatura se ve luego en *Asignaturas*.
-3. **Calendario mensual** (pieza central). Cada examen/entrega aparece como una
-   etiqueta de color en su día, con la hora en el detalle; los días con 2+
-   eventos se resaltan como colisión. Clic en un día con eventos para ver el
-   detalle; clic en un día vacío para empezar a capturar algo con esa fecha
-   ya puesta.
-4. **Qué tocar hoy** y **Deuda de estudio**, bajo el calendario.
-5. En la columna lateral: **Próximos** (agenda cronológica de exámenes/entregas)
-   y el **mapa de calor del cuatrimestre** (una celda por semana; el color es
-   la carga — eventos + deuda de estudio acumulada).
+## Datos
 
-Debajo, en secciones plegables: **Asignaturas** (con alias para el clasificador
-y un botón para **archivarlas** al terminar el cuatrimestre — dejan de salir en
-la captura y en la deuda, pero sus datos no se borran), **Temas**, **Eventos**
-y **Datos** (exportar/importar JSON, exportar a Calendario en `.ics`, datos de
-ejemplo, rango del cuatrimestre, borrar todo).
+En **Firestore** (proyecto de Firebase `matricula-ander`, plan gratuito), con
+caché en el dispositivo: funciona sin conexión y sincroniza al volver la red.
+Así lo que se captura en Safari por NFC y lo de la app de pantalla de inicio
+es lo mismo (en iPhone no comparten almacenamiento local).
 
-### Primer arranque
+- Colecciones `asignaturas`, `eventos`, `temas`, `sin_clasificar`, `sesiones`
+  (un documento por elemento) y el documento `meta/principal`.
+- Sin cuentas (como Control de gastos): las reglas de `firestore.rules`
+  limitan colecciones, ids y tamaño. Para publicarlas:
+  `firebase deploy --only firestore:rules --project matricula-ander`.
+- Al abrir la nueva versión en un navegador que tenga datos del organizador
+  antiguo (`localStorage` `organizador_estudio_v1`), se suben solos a la nube
+  sin duplicar ni pisar nada.
 
-1. Abre la web.
-2. En **Asignaturas**, añade tus asignaturas y sus alias (p. ej. `Contabilidad`
-   con alias `conta`).
-3. Empieza a capturar. O pulsa **Cargar datos de ejemplo** en *Datos* para ver
-   cómo queda.
+## Instalar en el iPhone
 
-## Desarrollo local
+Safari → Compartir → **Añadir a pantalla de inicio**. Icono, pantallas de
+carga (claro/oscuro) y barra de estado van en `docs/index.html` y
+`docs/manifest.webmanifest`.
 
-No hay build. Abre `docs/index.html` en el navegador, o sirve la carpeta:
+## Desarrollo
 
-```bash
-cd docs
-python -m http.server 8000
-# http://localhost:8000
-```
+Estático, sin build: HTML + CSS + módulos JS en `docs/` (GitHub Pages sirve
+esa carpeta desde `main`). Para probar en local sirve `docs/` con cualquier
+servidor estático. `docs/sw.js` cachea la app para usarla sin conexión: si
+añades un archivo, añádelo a su lista y sube `CACHE`.
 
-## Desplegar en GitHub Pages
-
-El sitio ya está listo en la carpeta `docs/`.
-
-1. Crea un repositorio en GitHub y sube este proyecto:
-   ```bash
-   git remote add origin https://github.com/TU_USUARIO/organizador-estudio.git
-   git push -u origin main
-   ```
-2. En GitHub, entra en **Settings → Pages**.
-3. En **Build and deployment → Source**, elige **Deploy from a branch**.
-4. En **Branch**, selecciona `main` y la carpeta **`/docs`**. Pulsa **Save**.
-5. Espera un minuto y recarga. Pages mostrará la URL pública
-   (`https://TU_USUARIO.github.io/organizador-estudio/`).
-
-No hay variables de entorno ni secretos. Cualquier cambio que hagas en `docs/` y
-subas a `main` se publica solo.
-
-## Copia de seguridad y calendario nativo
-
-Los datos son locales a cada navegador. Usa **Datos → Exportar todo (JSON)** para
-guardar una copia completa (y **Importar JSON** para restaurarla o moverla a otro
-equipo) — si pasan 14 días sin exportar, el resumen de arriba te lo recuerda.
-
-Además, **Datos → Exportar a Calendario (.ics)** genera un archivo con todos los
-exámenes/entregas para importar en el Calendario de iPhone (o cualquier app de
-calendario): así es esa app, con permisos de verdad, la que te avisa con
-notificaciones — esta web nunca las manda (ver "Fuera de esta versión"). En
-iPhone, el botón intenta abrir directamente el panel "Compartir → Añadir a
-Calendario"; si el navegador no lo soporta, descarga el `.ics` normal.
-
-## Modelo de datos
-
-`localStorage` bajo la clave `organizador_estudio_v1`:
-
-- `asignaturas`: `{ id, nombre, alias[], archivada? }` (`archivada: true` la
-  oculta del clasificador, la deuda y la sugerencia diaria, sin borrar nada)
-- `eventos`: `{ id, asignatura_id, tipo: "examen"|"entrega", fecha, hora, nota, nota_omitida?, temas_relacionados[], texto_original }`
-  (`hora` es opcional, formato `"HH:MM"`; se detecta del texto — "a las 10", "10:30",
-  "16h", "a las 3 de la tarde" — o se añade a mano en *Eventos*. `nota` es la
-  calificación 0-10, opcional; `nota_omitida: true` significa "no lo sé, no
-  preguntes más" para ese evento)
-- `temas`: `{ id, asignatura_id, nombre, fecha_ultimo_repaso, dificultad: "cuesta_arriba"|"repaso_rapido", dias_evitado_consecutivos }`
-- `sin_clasificar`: `{ id, texto_original, asignatura_id, tipo, fecha, hora }`
-- `meta`: `{ cuatrimestre_inicio, cuatrimestre_fin, sugerencia, ultima_exportacion }`
-
-## Fuera de esta versión
-
-Sin sincronización entre dispositivos, sin login, sin llamadas a IA, sin PWA, sin
-notificaciones push propias (para eso está la exportación a `.ics`), sin atajos
-de teclado.
+Iconos y pantallas de carga: `node herramientas/servidor.js`, abrir
+`http://localhost:4193/generar-iconos.html` y en la consola
+`await exportarTodo()`. Si cambian, sube el `?v=` de sus URLs (iOS cachea el
+icono por URL).

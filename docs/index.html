@@ -1,149 +1,97 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="color-scheme" content="light dark" />
-  <meta name="theme-color" content="#f3f4f7" media="(prefers-color-scheme: light)" />
-  <meta name="theme-color" content="#0e0f13" media="(prefers-color-scheme: dark)" />
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='3' y='4.5' width='18' height='16' rx='3.2' fill='none' stroke='%234f46e5' stroke-width='1.8'/%3E%3Cline x1='3' y1='9.2' x2='21' y2='9.2' stroke='%234f46e5' stroke-width='1.8'/%3E%3Crect x='6.6' y='12' width='3.6' height='3.6' rx='0.8' fill='%234f46e5'/%3E%3Crect x='14' y='12' width='3.6' height='3.6' rx='0.8' fill='%234f46e5' opacity='.45'/%3E%3C/svg%3E" />
-  <title>Organizador de estudio</title>
-  <link rel="stylesheet" href="styles.css" />
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<title>Matrícula</title>
+<meta name="description" content="Tu cuatrimestre bajo control: exámenes, repaso espaciado, foco y notas.">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#111b45">
+<link rel="manifest" href="manifest.webmanifest?v=1">
+<link rel="icon" type="image/png" href="icons/favicon.png?v=1">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png?v=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Matrícula">
+<!-- Barra de estado transparente sobre el azul noche de la cabecera (texto blanco) -->
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<!-- Pantallas de carga de iOS (10 tamaños de iPhone x claro/oscuro). Si el
+     modelo no coincide con ninguno, Safari muestra el fondo liso. -->
+<link rel="apple-touch-startup-image" href="icons/splash/splash-750-x-1334-light.jpg?v=1"
+  media="(prefers-color-scheme: light) and (device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="icons/splash/splash-750-x-1334-dark.jpg?v=1"
+  media="(prefers-color-scheme: dark) and (device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="icons/splash/splash-828-x-1792-light.jpg?v=1"
+  media="(prefers-color-scheme: light) and (device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="icons/splash/splash-828-x-1792-dark.jpg?v=1"
+  media="(prefers-color-scheme: dark) and (device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="icons/splash/splash-1242-x-2688-light.jpg?v=1"
+  media="(prefers-color-scheme: light) and (device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="icons/splash/splash-1242-x-2688-dark.jpg?v=1"
+  media="(prefers-color-scheme: dark) and (device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="icons/splash/splash-1125-x-2436-light.jpg?v=1"
+  media="(prefers-color-scheme: light) and (device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="icons/splash/splash-1125-x-2436-dark.jpg?v=1"
+  media="(prefers-color-scheme: dark) and (device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="icons/splash/splash-1170-x-2532-light.jpg?v=1"
+  media="(prefers-color-scheme: light) and (device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="icons/splash/splash-1170-x-2532-dark.jpg?v=1"
+  media="(prefers-color-scheme: dark) and (device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="icons/splash/splash-1179-x-2556-light.jpg?v=1"
+  media="(prefers-color-scheme: light) and (device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="icons/splash/splash-1179-x-2556-dark.jpg?v=1"
+  media="(prefers-color-scheme: dark) and (device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="icons/splash/splash-1284-x-2778-light.jpg?v=1"
+  media="(prefers-color-scheme: light) and (device-width: 428px) and (device-height: 926px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="icons/splash/splash-1284-x-2778-dark.jpg?v=1"
+  media="(prefers-color-scheme: dark) and (device-width: 428px) and (device-height: 926px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="icons/splash/splash-1290-x-2796-light.jpg?v=1"
+  media="(prefers-color-scheme: light) and (device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="icons/splash/splash-1290-x-2796-dark.jpg?v=1"
+  media="(prefers-color-scheme: dark) and (device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="icons/splash/splash-1206-x-2622-light.jpg?v=1"
+  media="(prefers-color-scheme: light) and (device-width: 402px) and (device-height: 874px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="icons/splash/splash-1206-x-2622-dark.jpg?v=1"
+  media="(prefers-color-scheme: dark) and (device-width: 402px) and (device-height: 874px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="icons/splash/splash-1320-x-2868-light.jpg?v=1"
+  media="(prefers-color-scheme: light) and (device-width: 440px) and (device-height: 956px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="icons/splash/splash-1320-x-2868-dark.jpg?v=1"
+  media="(prefers-color-scheme: dark) and (device-width: 440px) and (device-height: 956px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@1,9..144,600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/estilo.css">
+<script>
+  // Sin consola en el móvil: si algo falla, que se vea en pantalla.
+  function mostrarError(m) {
+    var d = document.getElementById("error-global");
+    if (!d) { d = document.createElement("div"); d.id = "error-global"; document.body.appendChild(d); }
+    d.textContent = "Algo ha fallado: " + m + " — toca para cerrar";
+    d.onclick = function () { d.remove(); };
+  }
+  addEventListener("error", function (e) { if (e.message) mostrarError(e.message); });
+  addEventListener("unhandledrejection", function (e) { mostrarError((e.reason && e.reason.message) || String(e.reason)); });
+</script>
 </head>
 <body>
-  <header id="topbar">
-    <div class="topbar-inner">
-      <div class="brand">
-        <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true">
-          <rect x="3" y="4.5" width="18" height="16" rx="3.2" fill="none" stroke="currentColor" stroke-width="1.6"/>
-          <line x1="3" y1="9.2" x2="21" y2="9.2" stroke="currentColor" stroke-width="1.6"/>
-          <line x1="7.2" y1="2.6" x2="7.2" y2="6.4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
-          <line x1="16.8" y1="2.6" x2="16.8" y2="6.4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
-          <rect x="6.6" y="12" width="3.1" height="3.1" rx="0.7" fill="currentColor"/>
-          <rect x="14.3" y="12" width="3.1" height="3.1" rx="0.7" fill="currentColor" opacity=".45"/>
-        </svg>
-        <div class="brand-text">
-          <strong>Organizador</strong>
-          <span>tu calendario del cuatrimestre</span>
-        </div>
-      </div>
-
-      <form id="captura-form" autocomplete="off">
-        <svg class="cap-icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-          <path d="M11 4a7 7 0 1 0 4.9 12l4.05 4.05 1.4-1.4L17.3 14.6A7 7 0 0 0 11 4Zm0 2a5 5 0 1 1 0 10 5 5 0 0 1 0-10Z" fill="currentColor"/>
-        </svg>
-        <input
-          id="captura-input"
-          type="text"
-          inputmode="text"
-          enterkeyhint="send"
-          autocapitalize="sentences"
-          autocorrect="off"
-          spellcheck="false"
-          autofocus
-          aria-label="Bandeja de captura"
-          placeholder="examen de contabilidad el 14 a las 10 · repasar tema 3 de estadística · entrega de organizacional el viernes" />
-        <button type="submit">Capturar</button>
-      </form>
-    </div>
-    <div id="captura-flash" class="flash" hidden></div>
-  </header>
-
-  <div class="subbar">
-    <div id="resumen" class="resumen"></div>
-    <div id="filtro-asignatura" class="filtro-asig" hidden></div>
+  <!-- Copia exacta de la pantalla de carga de iOS; al tener datos se "sella" y se va -->
+  <div id="arranque" aria-hidden="true">
+    <img class="arranque-sello" src="icons/sello.png" alt="">
+    <span class="arranque-nombre">Matrícula</span>
   </div>
 
-  <main class="dashboard">
-    <div class="col-main">
+  <div id="app">
+    <main id="vistas">
+      <section id="vista-hoy" class="vista activa" aria-label="Hoy"></section>
+      <section id="vista-calendario" class="vista" aria-label="Calendario" hidden></section>
+      <section id="vista-foco" class="vista" aria-label="Foco" hidden></section>
+      <section id="vista-asignaturas" class="vista" aria-label="Asignaturas" hidden></section>
+      <section id="vista-ajustes" class="vista" aria-label="Ajustes" hidden></section>
+    </main>
+    <nav id="pestanas" role="tablist" aria-label="Secciones"></nav>
+  </div>
+  <div id="avisos" aria-live="polite"></div>
 
-      <section id="sin-clasificar-sec" class="card sc-card" hidden>
-        <h2>Sin clasificar</h2>
-        <p class="hint">No se perdió nada. Corrige asignatura, tipo y fecha, y pasa a su sitio.</p>
-        <div id="sin-clasificar-list"></div>
-      </section>
-
-      <section id="notas-pendientes-sec" class="card np-card" hidden>
-        <h2>¿Qué tal te fue?</h2>
-        <p class="hint">Apunta la nota para ver la media por asignatura. Es opcional — "No lo sé" no vuelve a preguntar.</p>
-        <div id="notas-pendientes-list"></div>
-      </section>
-
-      <section id="calendario-sec" class="card cal-card">
-        <div class="cal-head">
-          <button type="button" id="cal-prev" class="icon-btn" aria-label="Mes anterior">‹</button>
-          <h2 id="cal-label">—</h2>
-          <button type="button" id="cal-next" class="icon-btn" aria-label="Mes siguiente">›</button>
-          <button type="button" id="cal-hoy" class="ghost small">Hoy</button>
-        </div>
-        <div class="cal-weekdays">
-          <span>L</span><span>M</span><span>X</span><span>J</span><span>V</span><span>S</span><span>D</span>
-        </div>
-        <div id="calendario" class="cal-grid"></div>
-        <div id="calendario-detalle" class="detalle" hidden></div>
-      </section>
-
-      <section id="sugerencia-sec" class="card">
-        <h2>Qué tocar hoy</h2>
-        <div id="sugerencia"></div>
-      </section>
-
-      <section id="deuda-sec" class="card">
-        <h2>Deuda de estudio</h2>
-        <p class="hint">Ordenado por urgencia. El contador de evitación es solo un dato, sin regañina.</p>
-        <div id="deuda"></div>
-      </section>
-    </div>
-
-    <aside class="col-side">
-      <section id="proximos-sec" class="card">
-        <h2>Próximos</h2>
-        <div id="proximos"></div>
-      </section>
-
-      <section id="heatmap-sec" class="card">
-        <h2>Mapa de calor del cuatrimestre</h2>
-        <p class="hint">Una celda por semana. El color es la carga: eventos más deuda acumulada.</p>
-        <div class="heatmap-wrap"><div id="heatmap" class="heatmap"></div></div>
-        <div class="hm-leyenda">
-          <span>menos</span>
-          <i class="hm-cell n0"></i><i class="hm-cell n1"></i><i class="hm-cell n2"></i><i class="hm-cell n3"></i><i class="hm-cell n4"></i>
-          <span>más</span>
-        </div>
-        <div id="heatmap-detalle" class="detalle" hidden></div>
-      </section>
-    </aside>
-
-    <div class="col-full">
-      <details id="cfg-asignaturas" class="card">
-        <summary>Asignaturas</summary>
-        <p class="hint">El clasificador reconoce una asignatura por su nombre o por cualquiera de sus alias.
-          Al terminar un cuatrimestre, archívalas para que no salgan en la captura ni en la deuda
-          (sus datos no se borran).</p>
-        <div id="asignaturas-panel"></div>
-      </details>
-
-      <details id="cfg-temas" class="card">
-        <summary>Temas</summary>
-        <div id="temas-panel"></div>
-      </details>
-
-      <details id="cfg-eventos" class="card">
-        <summary>Eventos</summary>
-        <div id="eventos-panel"></div>
-      </details>
-
-      <details id="cfg-datos" class="card">
-        <summary>Datos y copia de seguridad</summary>
-        <div id="datos-panel"></div>
-      </details>
-
-      <footer>
-        <p class="muted">Todo se guarda solo en este navegador (localStorage). Sin cuentas, sin servidores, sin sincronización.</p>
-      </footer>
-    </div>
-  </main>
-
-  <script src="app.js" defer></script>
+  <script type="module" src="js/app.js?v=1"></script>
 </body>
 </html>

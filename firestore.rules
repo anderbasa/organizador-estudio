@@ -1,0 +1,19 @@
+rules_version = '2';
+
+// App personal sin cuentas (igual que Control de gastos): cualquiera con la
+// configuración pública podría leer/escribir, así que al menos se limita a las
+// colecciones conocidas, ids "limpios" y documentos pequeños.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function coleccionValida(col) {
+      return col in ['asignaturas', 'eventos', 'temas', 'sin_clasificar', 'sesiones', 'meta'];
+    }
+
+    match /{col}/{id} {
+      allow read, delete: if coleccionValida(col);
+      allow create, update: if coleccionValida(col)
+        && id.matches('^[A-Za-z0-9_-]{1,64}$')
+        && request.resource.data.size() <= 40;
+    }
+  }
+}

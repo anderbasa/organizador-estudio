@@ -1,0 +1,142 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,800;1,9..144,600&display=swap" rel="stylesheet">
+<style>body{margin:0;background:#222;color:#eee;font:14px sans-serif;padding:16px}canvas{max-width:240px;margin:6px;border-radius:12px}</style>
+</head><body>
+<div id="out"></div>
+<script>
+const S = 1024;
+const D = (g) => (g * Math.PI) / 180;
+function lin(ctx, x0, y0, x1, y1, stops) { const g = ctx.createLinearGradient(x0, y0, x1, y1); stops.forEach(([o, c]) => g.addColorStop(o, c)); return g; }
+function rad(ctx, x, y, r, stops) { const g = ctx.createRadialGradient(x, y, 0, x, y, r); stops.forEach(([o, c]) => g.addColorStop(o, c)); return g; }
+function sombra(ctx, blur, dy, color) { ctx.shadowColor = color; ctx.shadowBlur = blur; ctx.shadowOffsetX = 0; ctx.shadowOffsetY = dy; }
+function lienzo(w, h) { const c = document.createElement("canvas"); c.width = w; c.height = h; return c; }
+let NOISE;
+function grano(ctx, alpha) {
+  if (!NOISE) {
+    NOISE = lienzo(S, S);
+    const n = NOISE.getContext("2d"), img = n.createImageData(S, S);
+    for (let i = 0; i < img.data.length; i += 4) { const v = Math.random() * 255; img.data[i] = img.data[i + 1] = img.data[i + 2] = v; img.data[i + 3] = 255; }
+    n.putImageData(img, 0, 0);
+  }
+  ctx.save(); ctx.globalAlpha = alpha; ctx.globalCompositeOperation = "overlay"; ctx.drawImage(NOISE, 0, 0); ctx.restore();
+}
+function squircle(ctx, size, n = 5) {
+  const r = size / 2; ctx.beginPath();
+  for (let i = 0; i <= 360; i++) {
+    const t = (i / 360) * Math.PI * 2, c = Math.cos(t), s = Math.sin(t);
+    const px = r + r * Math.sign(c) * Math.pow(Math.abs(c), 2 / n), py = r + r * Math.sign(s) * Math.pow(Math.abs(s), 2 / n);
+    i ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+  }
+  ctx.closePath();
+}
+function estrella(ctx, cx, cy, r) {
+  ctx.beginPath();
+  for (let i = 0; i < 10; i++) { const rr = i % 2 ? r * 0.45 : r, a = -Math.PI / 2 + (i * Math.PI) / 5; ctx.lineTo(cx + rr * Math.cos(a), cy + rr * Math.sin(a)); }
+  ctx.closePath();
+}
+function hoja(ctx, L, W) { ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(L / 2, -W, L, 0); ctx.quadraticCurveTo(L / 2, W, 0, 0); ctx.closePath(); }
+
+// Fondo azul noche. Las MISMAS paradas que usa la app (css: --marca-degradado y #arranque).
+const FONDOS = {
+  light: { stops: [[0, "#26387f"], [0.55, "#111b45"], [1, "#060a1a"]], glow: "rgba(110,140,255,0.40)" },
+  dark: { stops: [[0, "#18245a"], [0.55, "#0b1233"], [1, "#03050e"]], glow: "rgba(110,140,255,0.22)" },
+};
+function fondo(ctx, W, H, tema = "light", dpr = 1) {
+  // equivalente exacto de CSS "linear-gradient(to bottom right, ...)"
+  const L = (W * H) / Math.hypot(W, H), dx = H / Math.hypot(W, H), dy = W / Math.hypot(W, H);
+  ctx.fillStyle = lin(ctx, W / 2 - dx * L, H / 2 - dy * L, W / 2 + dx * L, H / 2 + dy * L, FONDOS[tema].stops);
+  ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = rad(ctx, W * 0.3, H * 0.2, Math.max(W, H) * 0.75, [[0, FONDOS[tema].glow], [1, "rgba(110,140,255,0)"]]);
+  ctx.fillRect(0, 0, W, H);
+}
+
+// Sello: aro fino + laurel + estrella + MH, en espacio 1024 y fondo transparente
+function sello(ctx) {
+  const oro = lin(ctx, 0, 190, 0, 860, [[0, "#fff3d6"], [0.45, "#ecc983"], [1, "#b8873d"]]);
+  ctx.save(); ctx.strokeStyle = "rgba(236,201,131,0.28)"; ctx.lineWidth = 5;
+  ctx.beginPath(); ctx.arc(512, 512, 392, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
+  for (const lado of [-1, 1]) {
+    ctx.save();
+    if (lado === 1) { ctx.translate(1024, 0); ctx.scale(-1, 1); }
+    const cx = 512, cy = 520, R = 318, a0 = D(98), a1 = D(222);
+    sombra(ctx, 14, 6, "rgba(0,0,10,0.45)");
+    ctx.strokeStyle = oro; ctx.fillStyle = oro; ctx.lineWidth = 9; ctx.lineCap = "round";
+    ctx.beginPath(); ctx.arc(cx, cy, R, a0, a1); ctx.stroke();
+    const n = 8;
+    for (let i = 0; i < n; i++) {
+      const t = a0 + ((a1 - a0) * (i + 0.55)) / n, k = 1 - i * 0.05;
+      const px = cx + R * Math.cos(t), py = cy + R * Math.sin(t), tan = t + Math.PI / 2;
+      for (const s of [-1, 1]) { ctx.save(); ctx.translate(px, py); ctx.rotate(tan + s * 0.62); hoja(ctx, 74 * k, 22 * k); ctx.fill(); ctx.restore(); }
+    }
+    ctx.save(); ctx.translate(cx + R * Math.cos(a1), cy + R * Math.sin(a1)); ctx.rotate(a1 + Math.PI / 2); hoja(ctx, 62, 18); ctx.fill(); ctx.restore();
+    ctx.restore();
+  }
+  ctx.save(); sombra(ctx, 30, 12, "rgba(0,0,15,0.55)"); ctx.fillStyle = oro;
+  estrella(ctx, 512, 286, 30); ctx.fill();
+  ctx.font = "800 268px Fraunces"; ctx.letterSpacing = "-8px"; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+  ctx.fillText("MH", 512, 622);
+  ctx.restore();
+  ctx.save(); ctx.fillStyle = "rgba(236,201,131,0.75)"; ctx.fillRect(412, 668, 200, 5); ctx.restore();
+}
+
+// Icono completo: cuadrado opaco a sangre (iOS pone él las esquinas; si
+// redondeamos aquí, quedan doble redondeadas)
+function icono(ctx) {
+  fondo(ctx, S, S);
+  sello(ctx);
+  ctx.fillStyle = lin(ctx, 0, 0, 0, S, [[0, "rgba(255,255,255,0.16)"], [0.42, "rgba(255,255,255,0)"]]); ctx.fillRect(0, 0, S, S);
+  ctx.fillStyle = lin(ctx, 0, S * 0.6, 0, S, [[0, "rgba(0,0,0,0)"], [1, "rgba(0,0,0,0.16)"]]); ctx.fillRect(0, 0, S, S);
+  grano(ctx, 0.04);
+}
+
+function aEscala(src, size) { const o = lienzo(size, size), oc = o.getContext("2d"); oc.imageSmoothingQuality = "high"; oc.drawImage(src, 0, 0, size, size); return o; }
+
+// Pantalla de carga. Medidas en px CSS * dpr, las MISMAS que la animación
+// de arranque de la app (css: #arranque): sello de 240 px con el centro a
+// 60 px por encima de la mitad, y el nombre centrado 96 px por debajo.
+function splash(W, H, dpr, tema, selloC) {
+  const c = lienzo(W, H), ctx = c.getContext("2d");
+  fondo(ctx, W, H, tema, dpr);
+  const caja = 240 * dpr;
+  ctx.drawImage(selloC, W / 2 - caja / 2, H / 2 - 60 * dpr - caja / 2, caja, caja);
+  ctx.fillStyle = "#f1d9a6";
+  ctx.font = `italic 600 ${38 * dpr}px Fraunces`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.fillText("Matrícula", W / 2, H / 2 + 96 * dpr);
+  return c;
+}
+
+const TAMANOS = [
+  [750, 1334, 2], [828, 1792, 2], [1242, 2688, 3], [1125, 2436, 3], [1170, 2532, 3],
+  [1179, 2556, 3], [1284, 2778, 3], [1290, 2796, 3], [1206, 2622, 3], [1320, 2868, 3],
+];
+
+async function guardar(nombre, canvas) {
+  const tipo = nombre.endsWith(".jpg") ? "image/jpeg" : "image/png";
+  const r = await fetch("/guardar?nombre=" + encodeURIComponent(nombre), { method: "POST", body: canvas.toDataURL(tipo, 0.9) });
+  return r.text();
+}
+
+window.exportarTodo = async () => {
+  await document.fonts.load("800 100px Fraunces");
+  await document.fonts.load("italic 600 100px Fraunces");
+  const log = [];
+  const base = lienzo(S, S); icono(base.getContext("2d"));
+  log.push(await guardar("icon-512.png", aEscala(base, 512)));
+  log.push(await guardar("icon-192.png", aEscala(base, 192)));
+  log.push(await guardar("apple-touch-icon.png", aEscala(base, 180)));
+  const fav = lienzo(64, 64), fc = fav.getContext("2d");
+  squircle(fc, 64); fc.clip(); fc.imageSmoothingQuality = "high"; fc.drawImage(base, 0, 0, 64, 64);
+  log.push(await guardar("favicon.png", fav));
+  // sello suelto, transparente, para la app (240 px CSS @3x)
+  const selloC = lienzo(S, S); sello(selloC.getContext("2d"));
+  log.push(await guardar("sello.png", aEscala(selloC, 720)));
+  // pantallas de carga en JPG (en PNG pesan MB por el tramado de los degradados)
+  for (const [w, h, dpr] of TAMANOS) {
+    for (const tema of ["light", "dark"]) log.push(await guardar(`splash/splash-${w}-x-${h}-${tema}.jpg`, splash(w, h, dpr, tema, selloC)));
+  }
+  document.getElementById("out").append(aEscala(base, 240), splash(1179, 2556, 3, "light", selloC), splash(1179, 2556, 3, "dark", selloC));
+  return log;
+};
+</script>
+</body></html>
