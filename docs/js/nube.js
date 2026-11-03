@@ -99,6 +99,12 @@ export function conectar() {
           DB.meta = snap.data();
           trasRecibir();
         }
+      } else if (!snap.metadata.fromCache && baseMeta !== null) {
+        // El servidor confirma que ya no existe (se borró) aunque lo teníamos:
+        // volver a crearlo con lo que hay en memoria. Solo con dato del
+        // servidor: una caché vacía no significa que no exista.
+        baseMeta = null;
+        sincronizar();
       }
       emitir(); quizaListo();
     }, (err) => { ultimoError = err.message; recibido.add("meta"); emitir(); quizaListo(); });

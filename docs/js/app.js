@@ -111,25 +111,34 @@ function vigilarScroll() {
 // (v2: se vació la nube tras la primera, el 03/11/2026).
 const MARCA_MIGRADO = "matricula.migrado.v2";
 async function migrarLegado() {
-  let crudo;
-  try { crudo = localStorage.getItem("organizador_estudio_v1"); if (!crudo || localStorage.getItem(MARCA_MIGRADO)) return; } catch { return; }
+  let crudo, hecho;
+  try { crudo = localStorage.getItem("organizador_estudio_v1"); hecho = !!localStorage.getItem(MARCA_MIGRADO); } catch { return; }
+  if (!crudo) return;
   await esperarServidor(); // saber qué hay ya en la nube antes de añadir nada
   let viejo;
   try { viejo = JSON.parse(crudo); } catch { return; }
-  let n = 0;
-  for (const k of ["asignaturas", "eventos", "temas", "sin_clasificar"]) {
-    for (const it of Array.isArray(viejo[k]) ? viejo[k] : []) {
-      if (!it || !/^[A-Za-z0-9_-]{1,64}$/.test(String(it.id)) || DB[k].some((x) => x.id === it.id)) continue;
-      DB[k].push(JSON.parse(JSON.stringify(it)));
-      n++;
+  let n = 0, cambios = false;
+  if (!hecho) {
+    for (const k of ["asignaturas", "eventos", "temas", "sin_clasificar"]) {
+      for (const it of Array.isArray(viejo[k]) ? viejo[k] : []) {
+        if (!it || !/^[A-Za-z0-9_-]{1,64}$/.test(String(it.id)) || DB[k].some((x) => x.id === it.id)) continue;
+        DB[k].push(JSON.parse(JSON.stringify(it)));
+        n++;
+      }
     }
+    cambios = true;
   }
-  if (viejo.meta && !DB.meta.migrado_en) {
-    for (const c of ["cuatrimestre_inicio", "cuatrimestre_fin"]) if (viejo.meta[c]) DB.meta[c] = viejo.meta[c];
+  // Fechas del cuatrimestre: mientras la nube no tenga los ajustes migrados
+  // (primera vez, o si se perdió el documento), se toman del organizador antiguo.
+  if (!DB.meta.migrado_en) {
+    if (viejo.meta) for (const c of ["cuatrimestre_inicio", "cuatrimestre_fin"]) if (viejo.meta[c]) DB.meta[c] = viejo.meta[c];
+    DB.meta.migrado_en = todayISO();
+    cambios = true;
   }
-  DB.meta.migrado_en = DB.meta.migrado_en || todayISO();
+  if (!cambios) return;
   normalizarTodo();
   guardar();
+  if (hecho) return;
   try { localStorage.setItem(MARCA_MIGRADO, new Date().toISOString()); } catch {}
   if (n) aviso(`He subido a la nube tus ${n} datos del organizador antiguo`, { duracion: 6000 });
 }
