@@ -106,9 +106,13 @@ function vigilarScroll() {
 
 /* ---------- Datos del organizador antiguo (localStorage de Safari) ---------- */
 
+// Solo añade lo que no esté ya en la nube (mismo id), así que repetirla no
+// duplica nada. La marca lleva versión: subirla fuerza una nueva pasada
+// (v2: se vació la nube tras la primera, el 03/11/2026).
+const MARCA_MIGRADO = "matricula.migrado.v2";
 async function migrarLegado() {
   let crudo;
-  try { crudo = localStorage.getItem("organizador_estudio_v1"); if (!crudo || localStorage.getItem("matricula.migrado")) return; } catch { return; }
+  try { crudo = localStorage.getItem("organizador_estudio_v1"); if (!crudo || localStorage.getItem(MARCA_MIGRADO)) return; } catch { return; }
   await esperarServidor(); // saber qué hay ya en la nube antes de añadir nada
   let viejo;
   try { viejo = JSON.parse(crudo); } catch { return; }
@@ -126,7 +130,7 @@ async function migrarLegado() {
   DB.meta.migrado_en = DB.meta.migrado_en || todayISO();
   normalizarTodo();
   guardar();
-  try { localStorage.setItem("matricula.migrado", new Date().toISOString()); } catch {}
+  try { localStorage.setItem(MARCA_MIGRADO, new Date().toISOString()); } catch {}
   if (n) aviso(`He subido a la nube tus ${n} datos del organizador antiguo`, { duracion: 6000 });
 }
 
